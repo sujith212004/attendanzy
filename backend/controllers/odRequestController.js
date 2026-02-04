@@ -1,5 +1,5 @@
 const ODRequest = require('../models/ODRequest');
-const { notifyStaffOnNewRequest, notifyHODOnForward, notifyStudentOnStatusChange } = require('../services/notificationService');
+const { notifyStaffOnNewRequest, notifyHODOnForward, notifyStudentOnStatusChange, notifyStaffOnHODDecision } = require('../services/notificationService');
 
 // Submit OD Request
 exports.submitODRequest = async (req, res) => {
@@ -304,6 +304,13 @@ exports.updateHODStatus = async (req, res) => {
             await notifyStudentOnStatusChange(odRequest, 'OD', status, 'hod');
         } catch (notifError) {
             console.error('Student HOD notification error:', notifError);
+        }
+
+        // Notify staff about HOD decision
+        try {
+            await notifyStaffOnHODDecision(odRequest, 'OD', status);
+        } catch (notifError) {
+            console.error('Staff HOD notification error:', notifError);
         }
 
         res.status(200).json({

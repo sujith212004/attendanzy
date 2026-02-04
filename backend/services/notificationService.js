@@ -8,13 +8,13 @@ let firebaseInitialized = false;
 
 const initializeFirebase = () => {
     if (firebaseInitialized) return;
-    
+
     try {
         // Use service account from environment variable or file
-        const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT 
+        const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
             ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
             : require('../config/firebase-service-account.json');
-        
+
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount)
         });
@@ -46,41 +46,41 @@ const sendNotificationToUser = async (userEmail, title, body, data = {}) => {
         // Find user in all collections (User, Staff, HOD) and get their FCM token
         const emailLower = userEmail.toLowerCase();
         console.log(`Looking for user with email: ${emailLower}`);
-        
+
         let user = await User.findOne({ email: emailLower });
         let userType = 'Student';
-        
+
         if (!user) {
-            user = await Staff.findOne({ 
+            user = await Staff.findOne({
                 $or: [
-                    { email: emailLower }, 
+                    { email: emailLower },
                     { 'College Email': emailLower },
                     { email: new RegExp(`^${emailLower}$`, 'i') },
                     { 'College Email': new RegExp(`^${emailLower}$`, 'i') }
-                ] 
+                ]
             });
             userType = 'Staff';
         }
-        
+
         if (!user) {
-            user = await HOD.findOne({ 
+            user = await HOD.findOne({
                 $or: [
-                    { email: emailLower }, 
+                    { email: emailLower },
                     { 'College Email': emailLower },
                     { email: new RegExp(`^${emailLower}$`, 'i') },
                     { 'College Email': new RegExp(`^${emailLower}$`, 'i') }
-                ] 
+                ]
             });
             userType = 'HOD';
         }
-        
+
         if (!user) {
             console.log(`User not found: ${userEmail}`);
             return { success: false, message: 'User not found' };
         }
-        
+
         console.log(`Found ${userType}: ${user.name || user.Name} (${user.email || user['College Email']})`);
-        
+
         if (!user.fcmToken) {
             console.log(`No FCM token found for ${userType}: ${userEmail}`);
             return { success: false, message: 'FCM token not found' };
@@ -141,7 +141,7 @@ const notifyStaffOnNewRequest = async (request, requestType) => {
 
         // Filter staff with FCM tokens
         const staffWithTokens = staffList.filter(s => s.fcmToken);
-        
+
         if (staffWithTokens.length === 0) {
             console.log(`No staff have FCM tokens registered. Staff found: ${staffList.map(s => s.email).join(', ')}`);
             return { success: false, message: 'No staff have FCM tokens registered' };
@@ -157,11 +157,11 @@ const notifyStaffOnNewRequest = async (request, requestType) => {
 
         const successCount = results.filter(r => r.success).length;
         console.log(`Notifications sent: ${successCount}/${staffWithTokens.length} successful`);
-        
-        return { 
-            success: successCount > 0, 
+
+        return {
+            success: successCount > 0,
             message: `Notified ${successCount} of ${staffWithTokens.length} staff members`,
-            results 
+            results
         };
     } catch (error) {
         console.error('Error in notifyStaffOnNewRequest:', error);
@@ -185,7 +185,7 @@ const notifyHODOnForward = async (request, requestType) => {
         };
 
         // Find HOD for this department in HOD collection
-        const hod = await HOD.findOne({ 
+        const hod = await HOD.findOne({
             department: request.department
         });
 
@@ -193,7 +193,7 @@ const notifyHODOnForward = async (request, requestType) => {
             console.log(`Notifying HOD ${hod.email} about forwarded ${requestType} request`);
             return await sendNotificationToUser(hod.email, title, body, data);
         }
-        
+
         console.log(`No HOD found for department: ${request.department}`);
         return { success: false, message: 'No HOD found for department' };
     } catch (error) {
@@ -208,9 +208,9 @@ const notifyHODOnForward = async (request, requestType) => {
 const notifyStudentOnStatusChange = async (request, requestType, newStatus, approverRole) => {
     const statusText = newStatus.toLowerCase();
     const studentName = request.studentName || request.name || 'Student';
-    
+
     let title, body;
-    
+
     if (approverRole === 'hod') {
         if (statusText === 'approved' || statusText === 'accepted') {
             title = `${requestType} Request Accepted`;
@@ -269,10 +269,62 @@ const updateFCMToken = async (email, fcmToken) => {
     }
 };
 
+/**
+ * Send notification to staff when HOD approves/rejects a request
+ */
+const notifyStaffOnHODDecision = async (request, requestType, status) => {
+    try {
+        const studentName = request.studentName || request.name || 'Student';
+        const title = `${requestType} Request ${status} by HOD`;
+        const body = `HOD has ${status.toLowerCase()} the ${requestType.toLowerCase()} request from ${studentName} (${request.year}, ${request.section}).`;
+
+        const data = {
+            type: 'hod_decision',
+            requestType: requestType,
+            requestId: request._id?.toString() || '',
+            studentEmail: request.studentEmail || '',
+            status: status
+        };
+
+        console.log(`Notifying staff about HOD decision for: dept=${request.department}, year=${request.year}, sec=${request.section}`);
+
+        // Find ALL staff for this department/year/section
+        const staffList = await Staff.find({
+            department: request.department,
+            year: request.year,
+            sec: request.section
+        });
+
+        if (!staffList || staffList.length === 0) {
+            console.log(`No staff found to notify about HOD decision.`);
+            return { success: false, message: 'No staff found' };
+        }
+
+        const staffWithTokens = staffList.filter(s => s.fcmToken);
+
+        if (staffWithTokens.length === 0) {
+            return { success: false, message: 'No staff have FCM tokens' };
+        }
+
+        const results = [];
+        for (const staff of staffWithTokens) {
+            console.log(`Notifying staff ${staff.name} about HOD decision`);
+            const result = await sendNotificationToUser(staff.email, title, body, data);
+            results.push({ email: staff.email, ...result });
+        }
+
+        return { success: true, results };
+    } catch (error) {
+        console.error('Error in notifyStaffOnHODDecision:', error);
+        return { success: false, error: error.message };
+    }
+};
+
 module.exports = {
     sendNotificationToUser,
     notifyStaffOnNewRequest,
     notifyHODOnForward,
     notifyStudentOnStatusChange,
+    notifyStaffOnHODDecision,
     updateFCMToken
 };
