@@ -109,7 +109,7 @@ const sendNotificationToUser = async (userEmail, title, body, data = {}) => {
 
 /**
  * Send notification to staff when student submits a request
- * Finds staff by department, year, and section
+ * Finds ALL staff by department, year, and section and notifies those with FCM tokens
  */
 const notifyStaffOnNewRequest = async (request, requestType) => {
     try {
@@ -122,20 +122,46 @@ const notifyStaffOnNewRequest = async (request, requestType) => {
             studentEmail: request.studentEmail || ''
         };
 
-        // Find staff for this department/year/section
-        const staff = await Staff.findOne({
+        console.log(`Looking for staff: dept=${request.department}, year=${request.year}, sec=${request.section}`);
+
+        // Find ALL staff for this department/year/section
+        const staffList = await Staff.find({
             department: request.department,
             year: request.year,
             sec: request.section
         });
 
-        if (staff && staff.email) {
-            console.log(`Notifying staff ${staff.email} about new ${requestType} request`);
-            return await sendNotificationToUser(staff.email, title, body, data);
+        if (!staffList || staffList.length === 0) {
+            console.log(`No staff found for dept=${request.department}, year=${request.year}, sec=${request.section}`);
+            return { success: false, message: 'No staff found for this class' };
         }
+
+        console.log(`Found ${staffList.length} staff members for this class`);
+
+        // Filter staff with FCM tokens
+        const staffWithTokens = staffList.filter(s => s.fcmToken);
         
-        console.log(`No staff found for dept=${request.department}, year=${request.year}, sec=${request.section}`);
-        return { success: false, message: 'No staff found for this class' };
+        if (staffWithTokens.length === 0) {
+            console.log(`No staff have FCM tokens registered. Staff found: ${staffList.map(s => s.email).join(', ')}`);
+            return { success: false, message: 'No staff have FCM tokens registered' };
+        }
+
+        // Send notification to ALL staff with FCM tokens
+        const results = [];
+        for (const staff of staffWithTokens) {
+            console.log(`Notifying staff ${staff.name} (${staff.email}) about new ${requestType} request`);
+            const result = await sendNotificationToUser(staff.email, title, body, data);
+            results.push({ email: staff.email, ...result });
+        }
+
+        const successCount = results.filter(r => r.success).length;
+        console.log(`Notifications sent: ${successCount}/${staffWithTokens.length} successful`);
+        
+        return { 
+            success: successCount > 0, 
+            message: `Notified ${successCount} of ${staffWithTokens.length} staff members`,
+            results 
+        };
     } catch (error) {
         console.error('Error in notifyStaffOnNewRequest:', error);
         return { success: false, error: error.message };
