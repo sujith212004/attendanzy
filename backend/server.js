@@ -1,8 +1,16 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const morgan = require('morgan');
 const connectDB = require('./config/database');
+
+// Security middleware
+let security;
+try {
+    security = require('./middleware/security');
+} catch (err) {
+    console.warn('Security middleware not found, using basic security');
+    security = null;
+}
 
 // Initialize express app
 const app = express();
@@ -10,18 +18,57 @@ const app = express();
 // Connect to MongoDB
 connectDB();
 
-// Middleware
-app.use(cors({
-    origin: '*', // Allow all origins (configure this properly in production)
-    credentials: true,
-}));
+// ============================================
+// Security Middleware (Production)
+// ============================================
+if (security && process.env.NODE_ENV === 'production') {
+    // Helmet for security headers
+    app.use(security.helmet());
+    
+    // Rate limiting
+    app.use(security.rateLimiter());
+    
+    // CORS with whitelist
+    app.use(security.cors());
+    
+    // Prevent NoSQL injection
+    app.use(security.mongoSanitize());
+    
+    // Prevent XSS attacks
+    app.use(security.xss());
+    
+    // Prevent HTTP Parameter Pollution
+    app.use(security.hpp());
+    
+    // Security headers
+    app.use(security.securityHeaders);
+    
+    // Input validation
+    app.use(security.validateInput);
+    
+    // Audit logging
+    app.use(security.auditLog);
+    
+    console.log('🔒 Production security middleware enabled');
+} else {
+    // Development CORS - allow all origins
+    const cors = require('cors');
+    app.use(cors({
+        origin: '*',
+        credentials: true,
+    }));
+    console.log('⚠️  Development mode - relaxed security');
+}
 
-app.use(express.json({ limit: '10mb' })); // For parsing application/json with larger payloads
-app.use(express.urlencoded({ extended: true, limit: '10mb' })); // For parsing application/x-www-form-urlencoded
+// Body parsers with size limits
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Logging middleware
 if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
+} else {
+    app.use(morgan('combined'));
 }
 
 // Routes

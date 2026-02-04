@@ -1,0 +1,52 @@
+{
+    "extends": "eslint:recommended",
+    "env": {
+        "node": true,
+        "es2022": true
+    },
+    "parserOptions": {
+        "ecmaVersion": 2022,
+        "sourceType": "module"
+    },
+    "rules": {
+        "no-console": "off",
+        "no-unused-vars": ["error", { "argsIgnorePattern": "^_|next" }],
+        "no-eval": "error",
+        "no-implied-eval": "error",
+        "no-new-func": "error",
+        "no-script-url": "error",
+        "no-with": "error",
+        "prefer-const": "error",
+        "no-var": "error",
+        "eqeqeq": ["error", "always"],
+        "curly": ["error", "all"],
+        "no-multi-str": "error",
+        "no-proto": "error",
+        "no-iterator": "error",
+        "no-extend-native": "error",
+        "no-caller": "error",
+        "strict": ["error", "global"],
+        "no-undef": "error",
+        "no-process-env": "off",
+        "security/detect-buffer-noassert": "off",
+        "security/detect-child-process": "warn",
+        "security/detect-disable-mustache-escape": "warn",
+        "security/detect-eval-with-expression": "error",
+        "security/detect-no-csrf-before-method-override": "warn",
+        "security/detect-non-literal-fs-filename": "warn",
+        "security/detect-non-literal-regexp": "warn",
+        "security/detect-non-literal-require": "warn",
+        "security/detect-object-injection": "warn",
+        "security/detect-possible-timing-attacks": "warn",
+        "security/detect-pseudoRandomBytes": "warn",
+        "security/detect-unsafe-regex": "error"
+    },
+    "plugins": [
+        "security"
+    ],
+    "ignorePatterns": [
+        "node_modules/",
+        "coverage/",
+        "dist/"
+    ]
+}
