@@ -75,6 +75,7 @@ if (process.env.NODE_ENV === 'development') {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/od-requests', require('./routes/odRequests'));
 app.use('/api/leave-requests', require('./routes/leaveRequests'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 // Health check route
 app.get('/api/health', (req, res) => {

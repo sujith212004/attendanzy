@@ -11,6 +11,9 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Firebase service account (sensitive)
+config/firebase-service-account.json
+
 # IDE
 .vscode/
 .idea/

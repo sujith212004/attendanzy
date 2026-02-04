@@ -1,4 +1,5 @@
 const LeaveRequest = require('../models/LeaveRequest');
+const { notifyStaffOnNewRequest, notifyHODOnForward, notifyStudentOnStatusChange } = require('../services/notificationService');
 
 // Submit Leave Request
 exports.submitLeaveRequest = async (req, res) => {
@@ -63,6 +64,13 @@ exports.submitLeaveRequest = async (req, res) => {
         });
 
         await leaveRequest.save();
+
+        // Send notification to staff
+        try {
+            await notifyStaffOnNewRequest(leaveRequest, 'Leave');
+        } catch (notifError) {
+            console.error('Notification error:', notifError);
+        }
 
         res.status(201).json({
             success: true,
@@ -210,6 +218,13 @@ exports.updateStaffStatus = async (req, res) => {
                 leaveRequest.rejectionReason = rejectionReason;
                 leaveRequest.staffRemarks = rejectionReason;
             }
+
+            // Notify student about rejection
+            try {
+                await notifyStudentOnStatusChange(leaveRequest, 'Leave', 'rejected', 'staff');
+            } catch (notifError) {
+                console.error('Student rejection notification error:', notifError);
+            }
         } else if (dbStatus === 'approved') {
             // Forwarding details
             if (staffName) leaveRequest.forwardedBy = staffName;
@@ -219,6 +234,20 @@ exports.updateStaffStatus = async (req, res) => {
             if (section) leaveRequest.section = section;
 
             leaveRequest.hodStatus = 'pending';
+
+            // Notify HOD about forwarded request
+            try {
+                await notifyHODOnForward(leaveRequest, 'Leave');
+            } catch (notifError) {
+                console.error('HOD notification error:', notifError);
+            }
+
+            // Notify student that request is forwarded
+            try {
+                await notifyStudentOnStatusChange(leaveRequest, 'Leave', 'forwarded', 'staff');
+            } catch (notifError) {
+                console.error('Student notification error:', notifError);
+            }
         }
 
         await leaveRequest.save();
@@ -279,6 +308,13 @@ exports.updateHODStatus = async (req, res) => {
         }
 
         await leaveRequest.save();
+
+        // Notify student about HOD decision
+        try {
+            await notifyStudentOnStatusChange(leaveRequest, 'Leave', status, 'hod');
+        } catch (notifError) {
+            console.error('Student HOD notification error:', notifError);
+        }
 
         res.status(200).json({
             success: true,

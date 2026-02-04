@@ -32,6 +32,14 @@ const userSchema = new mongoose.Schema({
     },
     rollNumber: String,
     phoneNumber: String,
+    fcmToken: {
+        type: String,
+        default: null,
+    },
+    fcmTokenUpdatedAt: {
+        type: Date,
+        default: null,
+    },
     createdAt: {
         type: Date,
         default: Date.now,

@@ -1,4 +1,5 @@
 const ODRequest = require('../models/ODRequest');
+const { notifyStaffOnNewRequest, notifyHODOnForward, notifyStudentOnStatusChange } = require('../services/notificationService');
 
 // Submit OD Request
 exports.submitODRequest = async (req, res) => {
@@ -43,6 +44,13 @@ exports.submitODRequest = async (req, res) => {
         });
 
         await odRequest.save();
+
+        // Send notification to staff
+        try {
+            await notifyStaffOnNewRequest(odRequest, 'OD');
+        } catch (notifError) {
+            console.error('Notification error:', notifError);
+        }
 
         res.status(201).json({
             success: true,
@@ -197,6 +205,13 @@ exports.updateStaffStatus = async (req, res) => {
                 odRequest.rejectionReason = rejectionReason;
                 odRequest.staffRemarks = rejectionReason; // Keep both for safety
             }
+
+            // Notify student about rejection
+            try {
+                await notifyStudentOnStatusChange(odRequest, 'OD', 'rejected', 'staff');
+            } catch (notifError) {
+                console.error('Student rejection notification error:', notifError);
+            }
         } else if (dbStatus === 'approved') {
             // Forwarding details
             if (staffName) odRequest.forwardedBy = staffName;
@@ -209,6 +224,20 @@ exports.updateStaffStatus = async (req, res) => {
             // Set HOD status to pending so it shows up for HOD
             odRequest.hodStatus = 'pending';
             // Status remains 'pending' overall until HOD approves (becomes 'accepted')
+
+            // Notify HOD about forwarded request
+            try {
+                await notifyHODOnForward(odRequest, 'OD');
+            } catch (notifError) {
+                console.error('HOD notification error:', notifError);
+            }
+
+            // Notify student that request is forwarded
+            try {
+                await notifyStudentOnStatusChange(odRequest, 'OD', 'forwarded', 'staff');
+            } catch (notifError) {
+                console.error('Student notification error:', notifError);
+            }
         }
 
         await odRequest.save();
@@ -269,6 +298,13 @@ exports.updateHODStatus = async (req, res) => {
         }
 
         await odRequest.save();
+
+        // Notify student about HOD decision
+        try {
+            await notifyStudentOnStatusChange(odRequest, 'OD', status, 'hod');
+        } catch (notifError) {
+            console.error('Student HOD notification error:', notifError);
+        }
 
         res.status(200).json({
             success: true,
