@@ -96,6 +96,7 @@ app.get('/', (req, res) => {
             auth: '/api/auth',
             odRequests: '/api/od-requests',
             leaveRequests: '/api/leave-requests',
+            notifications: '/api/notifications',
             health: '/api/health',
         },
     });
