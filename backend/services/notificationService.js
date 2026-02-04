@@ -205,33 +205,45 @@ const notifyHODOnForward = async (request, requestType) => {
  */
 const notifyStudentOnStatusChange = async (request, requestType, newStatus, approverRole) => {
     const statusText = newStatus.toLowerCase();
-    const approverText = approverRole === 'hod' ? 'HOD' : 'Staff';
     
     let title, body;
     
-    if (statusText === 'approved' || statusText === 'accepted') {
-        title = `${requestType} Request Approved! ✅`;
-        body = `Your ${requestType.toLowerCase()} request has been approved by ${approverText}`;
-    } else if (statusText === 'rejected') {
-        title = `${requestType} Request Rejected ❌`;
-        body = `Your ${requestType.toLowerCase()} request has been rejected by ${approverText}`;
-    } else if (statusText === 'forwarded') {
-        title = `${requestType} Request Forwarded 📤`;
-        body = `Your ${requestType.toLowerCase()} request has been forwarded to HOD for approval`;
+    if (approverRole === 'hod') {
+        if (statusText === 'approved' || statusText === 'accepted') {
+            title = `${requestType} Request Accepted! ✅`;
+            body = `Your ${requestType.toLowerCase()} request has been accepted by HOD`;
+        } else if (statusText === 'rejected') {
+            title = `${requestType} Request Rejected ❌`;
+            body = `Your ${requestType.toLowerCase()} request has been rejected by HOD`;
+        } else {
+            title = `${requestType} Request Updated`;
+            body = `Your ${requestType.toLowerCase()} request status: ${newStatus} by HOD`;
+        }
     } else {
-        title = `${requestType} Request Updated`;
-        body = `Your ${requestType.toLowerCase()} request status: ${newStatus}`;
+        // Staff actions
+        if (statusText === 'approved' || statusText === 'accepted' || statusText === 'forwarded') {
+            title = `${requestType} Request Forwarded 📤`;
+            body = `Your ${requestType.toLowerCase()} request has been forwarded by Staff to HOD for approval`;
+        } else if (statusText === 'rejected') {
+            title = `${requestType} Request Rejected ❌`;
+            body = `Your ${requestType.toLowerCase()} request has been rejected by Staff`;
+        } else {
+            title = `${requestType} Request Updated`;
+            body = `Your ${requestType.toLowerCase()} request status: ${newStatus} by Staff`;
+        }
     }
 
     const data = {
         type: 'status_update',
         requestType: requestType,
         requestId: request._id?.toString() || '',
-        status: newStatus
+        status: newStatus,
+        approverRole: approverRole
     };
 
     const studentEmail = request.studentEmail || request.email;
     if (studentEmail) {
+        console.log(`Notifying student ${studentEmail}: ${title} - ${body}`);
         return await sendNotificationToUser(studentEmail, title, body, data);
     }
     return { success: false, message: 'No student email found' };
