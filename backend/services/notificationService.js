@@ -1,5 +1,7 @@
 const admin = require('firebase-admin');
 const User = require('../models/User');
+const Staff = require('../models/Staff');
+const HOD = require('../models/HOD');
 
 // Initialize Firebase Admin (only once)
 let firebaseInitialized = false;
@@ -41,8 +43,21 @@ const sendNotificationToUser = async (userEmail, title, body, data = {}) => {
             return { success: false, message: 'Firebase not initialized' };
         }
 
-        // Find user and get their FCM token
-        const user = await User.findOne({ email: userEmail });
+        // Find user in all collections (User, Staff, HOD) and get their FCM token
+        const emailLower = userEmail.toLowerCase();
+        let user = await User.findOne({ email: emailLower });
+        
+        if (!user) {
+            user = await Staff.findOne({ 
+                $or: [{ email: emailLower }, { 'College Email': emailLower }] 
+            });
+        }
+        
+        if (!user) {
+            user = await HOD.findOne({ 
+                $or: [{ email: emailLower }, { 'College Email': emailLower }] 
+            });
+        }
         
         if (!user || !user.fcmToken) {
             console.log(`No FCM token found for user: ${userEmail}`);

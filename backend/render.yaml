@@ -1,0 +1,17 @@
+# Render Blueprint for Attendanzy Backend
+# Deploy at: https://dashboard.render.com/blueprints
+
+services:
+  - type: web
+    name: attendanzy-backend
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false  # Set manually in dashboard
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false  # Set manually in dashboard
+    healthCheckPath: /api/health

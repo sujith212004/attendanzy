@@ -31,6 +31,14 @@ const staffSchema = new mongoose.Schema({
     inchargeName: String,
     incharge: String,
     phoneNumber: String,
+    fcmToken: {
+        type: String,
+        default: null,
+    },
+    fcmTokenUpdatedAt: {
+        type: Date,
+        default: null,
+    },
 }, {
     collection: 'Staff', // Use existing collection name
     timestamps: false,

@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { updateFCMToken } = require('../services/notificationService');
 const User = require('../models/User');
+const Staff = require('../models/Staff');
+const HOD = require('../models/HOD');
 
 // Update FCM token for a user
 router.post('/update-token', async (req, res) => {
@@ -15,17 +17,40 @@ router.post('/update-token', async (req, res) => {
             });
         }
 
-        // Update token in database
-        const result = await User.findOneAndUpdate(
-            { email: email.toLowerCase() },
-            { 
-                fcmToken: fcmToken, 
-                fcmTokenUpdatedAt: new Date() 
-            },
+        // Update token in database - check all collections
+        const emailLower = email.toLowerCase();
+        const updateData = { 
+            fcmToken: fcmToken, 
+            fcmTokenUpdatedAt: new Date() 
+        };
+
+        // Try to update in User (profile) collection first
+        let result = await User.findOneAndUpdate(
+            { email: emailLower },
+            updateData,
             { new: true }
         );
 
+        // If not found in User, try Staff collection
+        if (!result) {
+            result = await Staff.findOneAndUpdate(
+                { $or: [{ email: emailLower }, { 'College Email': emailLower }] },
+                updateData,
+                { new: true }
+            );
+        }
+
+        // If not found in Staff, try HOD collection
+        if (!result) {
+            result = await HOD.findOneAndUpdate(
+                { $or: [{ email: emailLower }, { 'College Email': emailLower }] },
+                updateData,
+                { new: true }
+            );
+        }
+
         if (result) {
+            console.log(`FCM token updated for ${email}`);
             res.json({ 
                 success: true, 
                 message: 'FCM token updated successfully' 
@@ -33,7 +58,7 @@ router.post('/update-token', async (req, res) => {
         } else {
             res.status(404).json({ 
                 success: false, 
-                message: 'User not found' 
+                message: 'User not found in any collection' 
             });
         }
     } catch (error) {

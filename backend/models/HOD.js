@@ -26,6 +26,14 @@ const hodSchema = new mongoose.Schema({
         required: true,
     },
     phoneNumber: String,
+    fcmToken: {
+        type: String,
+        default: null,
+    },
+    fcmTokenUpdatedAt: {
+        type: Date,
+        default: null,
+    },
 }, {
     collection: 'HOD', // Use existing collection name
     timestamps: false,
