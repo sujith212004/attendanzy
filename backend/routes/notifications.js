@@ -24,29 +24,44 @@ router.post('/update-token', async (req, res) => {
             fcmTokenUpdatedAt: new Date() 
         };
 
+        console.log(`Attempting to update FCM token for: ${emailLower}`);
+
         // Try to update in User (profile) collection first
         let result = await User.findOneAndUpdate(
             { email: emailLower },
-            updateData,
+            { $set: updateData },
             { new: true }
         );
+        if (result) console.log(`Found in User/profile collection`);
 
         // If not found in User, try Staff collection
         if (!result) {
             result = await Staff.findOneAndUpdate(
-                { $or: [{ email: emailLower }, { 'College Email': emailLower }] },
-                updateData,
+                { $or: [
+                    { email: emailLower }, 
+                    { 'College Email': emailLower },
+                    { email: new RegExp(`^${emailLower}$`, 'i') },
+                    { 'College Email': new RegExp(`^${emailLower}$`, 'i') }
+                ]},
+                { $set: updateData },
                 { new: true }
             );
+            if (result) console.log(`Found in Staff collection`);
         }
 
         // If not found in Staff, try HOD collection
         if (!result) {
             result = await HOD.findOneAndUpdate(
-                { $or: [{ email: emailLower }, { 'College Email': emailLower }] },
-                updateData,
+                { $or: [
+                    { email: emailLower }, 
+                    { 'College Email': emailLower },
+                    { email: new RegExp(`^${emailLower}$`, 'i') },
+                    { 'College Email': new RegExp(`^${emailLower}$`, 'i') }
+                ]},
+                { $set: updateData },
                 { new: true }
             );
+            if (result) console.log(`Found in HOD collection`);
         }
 
         if (result) {

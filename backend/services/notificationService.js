@@ -45,23 +45,45 @@ const sendNotificationToUser = async (userEmail, title, body, data = {}) => {
 
         // Find user in all collections (User, Staff, HOD) and get their FCM token
         const emailLower = userEmail.toLowerCase();
+        console.log(`Looking for user with email: ${emailLower}`);
+        
         let user = await User.findOne({ email: emailLower });
+        let userType = 'Student';
         
         if (!user) {
             user = await Staff.findOne({ 
-                $or: [{ email: emailLower }, { 'College Email': emailLower }] 
+                $or: [
+                    { email: emailLower }, 
+                    { 'College Email': emailLower },
+                    { email: new RegExp(`^${emailLower}$`, 'i') },
+                    { 'College Email': new RegExp(`^${emailLower}$`, 'i') }
+                ] 
             });
+            userType = 'Staff';
         }
         
         if (!user) {
             user = await HOD.findOne({ 
-                $or: [{ email: emailLower }, { 'College Email': emailLower }] 
+                $or: [
+                    { email: emailLower }, 
+                    { 'College Email': emailLower },
+                    { email: new RegExp(`^${emailLower}$`, 'i') },
+                    { 'College Email': new RegExp(`^${emailLower}$`, 'i') }
+                ] 
             });
+            userType = 'HOD';
         }
         
-        if (!user || !user.fcmToken) {
-            console.log(`No FCM token found for user: ${userEmail}`);
-            return { success: false, message: 'User or FCM token not found' };
+        if (!user) {
+            console.log(`User not found: ${userEmail}`);
+            return { success: false, message: 'User not found' };
+        }
+        
+        console.log(`Found ${userType}: ${user.name || user.Name} (${user.email || user['College Email']})`);
+        
+        if (!user.fcmToken) {
+            console.log(`No FCM token found for ${userType}: ${userEmail}`);
+            return { success: false, message: 'FCM token not found' };
         }
 
         const message = {
