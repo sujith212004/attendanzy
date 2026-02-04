@@ -42,4 +42,14 @@ router.put('/:id/hod-status', leaveRequestController.updateHODStatus);
 // @access  Public
 router.get('/:id', leaveRequestController.getLeaveRequest);
 
+// @route   DELETE /api/leave-requests/:id
+// @desc    Delete leave request
+// @access  Public (Student)
+router.delete('/:id', leaveRequestController.deleteLeaveRequest);
+
+// @route   PUT /api/leave-requests/:id
+// @desc    Update/Edit leave request
+// @access  Public (Student)
+router.put('/:id', leaveRequestController.updateLeaveRequest);
+
 module.exports = router;

@@ -42,4 +42,14 @@ router.put('/:id/hod-status', odRequestController.updateHODStatus);
 // @access  Public
 router.get('/:id', odRequestController.getODRequest);
 
+// @route   DELETE /api/od-requests/:id
+// @desc    Delete OD request
+// @access  Public (Student)
+router.delete('/:id', odRequestController.deleteODRequest);
+
+// @route   PUT /api/od-requests/:id
+// @desc    Update/Edit OD request
+// @access  Public (Student)
+router.put('/:id', odRequestController.updateODRequest);
+
 module.exports = router;

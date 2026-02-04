@@ -345,3 +345,86 @@ exports.getAllODRequests = async (req, res) => {
         });
     }
 };
+
+// Delete OD request
+exports.deleteODRequest = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const odRequest = await ODRequest.findByIdAndDelete(id);
+
+        if (!odRequest) {
+            return res.status(404).json({
+                success: false,
+                message: 'OD request not found',
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'OD request deleted successfully',
+        });
+
+    } catch (error) {
+        console.error('Delete OD request error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete OD request',
+            error: error.message,
+        });
+    }
+};
+
+// Update OD request (edit)
+exports.updateODRequest = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updateData = req.body;
+
+        // Don't allow editing if already processed
+        const existing = await ODRequest.findById(id);
+        if (!existing) {
+            return res.status(404).json({
+                success: false,
+                message: 'OD request not found',
+            });
+        }
+
+        if (existing.status !== 'pending' && existing.staffStatus !== 'pending') {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot edit a processed OD request',
+            });
+        }
+
+        // Update allowed fields
+        const allowedUpdates = ['subject', 'content', 'from', 'to', 'image'];
+        const updates = {};
+        allowedUpdates.forEach(field => {
+            if (updateData[field] !== undefined) {
+                updates[field] = updateData[field];
+            }
+        });
+        updates.updatedAt = new Date().toISOString();
+
+        const odRequest = await ODRequest.findByIdAndUpdate(
+            id,
+            updates,
+            { new: true }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: 'OD request updated successfully',
+            data: odRequest,
+        });
+
+    } catch (error) {
+        console.error('Update OD request error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update OD request',
+            error: error.message,
+        });
+    }
+};

@@ -356,3 +356,86 @@ exports.getAllLeaveRequests = async (req, res) => {
         });
     }
 };
+
+// Delete leave request
+exports.deleteLeaveRequest = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const leaveRequest = await LeaveRequest.findByIdAndDelete(id);
+
+        if (!leaveRequest) {
+            return res.status(404).json({
+                success: false,
+                message: 'Leave request not found',
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Leave request deleted successfully',
+        });
+
+    } catch (error) {
+        console.error('Delete leave request error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete leave request',
+            error: error.message,
+        });
+    }
+};
+
+// Update leave request (edit)
+exports.updateLeaveRequest = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updateData = req.body;
+
+        // Don't allow editing if already processed
+        const existing = await LeaveRequest.findById(id);
+        if (!existing) {
+            return res.status(404).json({
+                success: false,
+                message: 'Leave request not found',
+            });
+        }
+
+        if (existing.status !== 'pending' && existing.staffStatus !== 'pending') {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot edit a processed leave request',
+            });
+        }
+
+        // Update allowed fields
+        const allowedUpdates = ['subject', 'content', 'reason', 'leaveType', 'fromDate', 'toDate', 'duration', 'image'];
+        const updates = {};
+        allowedUpdates.forEach(field => {
+            if (updateData[field] !== undefined) {
+                updates[field] = updateData[field];
+            }
+        });
+        updates.updatedAt = new Date().toISOString();
+
+        const leaveRequest = await LeaveRequest.findByIdAndUpdate(
+            id,
+            updates,
+            { new: true }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: 'Leave request updated successfully',
+            data: leaveRequest,
+        });
+
+    } catch (error) {
+        console.error('Update leave request error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update leave request',
+            error: error.message,
+        });
+    }
+};
