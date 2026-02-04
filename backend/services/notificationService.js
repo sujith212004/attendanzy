@@ -109,49 +109,69 @@ const sendNotificationToUser = async (userEmail, title, body, data = {}) => {
 
 /**
  * Send notification to staff when student submits a request
+ * Finds staff by department, year, and section
  */
 const notifyStaffOnNewRequest = async (request, requestType) => {
-    const title = `New ${requestType} Request`;
-    const body = `${request.studentName || request.name} has submitted a ${requestType.toLowerCase()} request`;
-    const data = {
-        type: 'new_request',
-        requestType: requestType,
-        requestId: request._id?.toString() || '',
-        studentEmail: request.studentEmail || ''
-    };
+    try {
+        const title = `New ${requestType} Request`;
+        const body = `${request.studentName || request.name} has submitted a ${requestType.toLowerCase()} request`;
+        const data = {
+            type: 'new_request',
+            requestType: requestType,
+            requestId: request._id?.toString() || '',
+            studentEmail: request.studentEmail || ''
+        };
 
-    // Find staff for this department/year/section
-    const staffEmail = request.classInChargeEmail || request.staffEmail;
-    if (staffEmail) {
-        return await sendNotificationToUser(staffEmail, title, body, data);
+        // Find staff for this department/year/section
+        const staff = await Staff.findOne({
+            department: request.department,
+            year: request.year,
+            sec: request.section
+        });
+
+        if (staff && staff.email) {
+            console.log(`Notifying staff ${staff.email} about new ${requestType} request`);
+            return await sendNotificationToUser(staff.email, title, body, data);
+        }
+        
+        console.log(`No staff found for dept=${request.department}, year=${request.year}, sec=${request.section}`);
+        return { success: false, message: 'No staff found for this class' };
+    } catch (error) {
+        console.error('Error in notifyStaffOnNewRequest:', error);
+        return { success: false, error: error.message };
     }
-    return { success: false, message: 'No staff email found' };
 };
 
 /**
  * Send notification to HOD when request is forwarded
  */
 const notifyHODOnForward = async (request, requestType) => {
-    const title = `${requestType} Request Forwarded`;
-    const body = `A ${requestType.toLowerCase()} request from ${request.studentName || request.name} needs your approval`;
-    const data = {
-        type: 'forwarded_request',
-        requestType: requestType,
-        requestId: request._id?.toString() || '',
-        studentEmail: request.studentEmail || ''
-    };
+    try {
+        const title = `${requestType} Request Forwarded`;
+        const body = `A ${requestType.toLowerCase()} request from ${request.studentName || request.name} needs your approval`;
+        const data = {
+            type: 'forwarded_request',
+            requestType: requestType,
+            requestId: request._id?.toString() || '',
+            studentEmail: request.studentEmail || ''
+        };
 
-    // Find HOD for this department
-    const User = require('../models/User');
-    const hod = await User.findOne({ 
-        department: request.department, 
-        role: 'hod' 
-    });
+        // Find HOD for this department in HOD collection
+        const hod = await HOD.findOne({ 
+            department: request.department
+        });
 
-    if (hod && hod.email) {
-        return await sendNotificationToUser(hod.email, title, body, data);
+        if (hod && hod.email) {
+            console.log(`Notifying HOD ${hod.email} about forwarded ${requestType} request`);
+            return await sendNotificationToUser(hod.email, title, body, data);
+        }
+        
+        console.log(`No HOD found for department: ${request.department}`);
+        return { success: false, message: 'No HOD found for department' };
+    } catch (error) {
+        console.error('Error in notifyHODOnForward:', error);
+        return { success: false, error: error.message };
     }
-    return { success: false, message: 'No HOD found for department' };
 };
 
 /**
