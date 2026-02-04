@@ -113,8 +113,9 @@ const sendNotificationToUser = async (userEmail, title, body, data = {}) => {
  */
 const notifyStaffOnNewRequest = async (request, requestType) => {
     try {
-        const title = `New ${requestType} Request`;
-        const body = `${request.studentName || request.name} has submitted a ${requestType.toLowerCase()} request`;
+        const studentName = request.studentName || request.name || 'A student';
+        const title = `New ${requestType} Request Received`;
+        const body = `${studentName} (${request.year}, ${request.section}) has submitted a ${requestType.toLowerCase()} request. Please review and take action.`;
         const data = {
             type: 'new_request',
             requestType: requestType,
@@ -173,8 +174,9 @@ const notifyStaffOnNewRequest = async (request, requestType) => {
  */
 const notifyHODOnForward = async (request, requestType) => {
     try {
-        const title = `${requestType} Request Forwarded`;
-        const body = `A ${requestType.toLowerCase()} request from ${request.studentName || request.name} needs your approval`;
+        const studentName = request.studentName || request.name || 'A student';
+        const title = `${requestType} Request - Awaiting Approval`;
+        const body = `A ${requestType.toLowerCase()} request from ${studentName} (${request.year}, ${request.section}) has been forwarded by Staff and requires your approval.`;
         const data = {
             type: 'forwarded_request',
             requestType: requestType,
@@ -205,31 +207,32 @@ const notifyHODOnForward = async (request, requestType) => {
  */
 const notifyStudentOnStatusChange = async (request, requestType, newStatus, approverRole) => {
     const statusText = newStatus.toLowerCase();
+    const studentName = request.studentName || request.name || 'Student';
     
     let title, body;
     
     if (approverRole === 'hod') {
         if (statusText === 'approved' || statusText === 'accepted') {
-            title = `${requestType} Request Accepted! ✅`;
-            body = `Your ${requestType.toLowerCase()} request has been accepted by HOD`;
+            title = `${requestType} Request Accepted`;
+            body = `Hi ${studentName}, your ${requestType.toLowerCase()} request has been accepted by HOD. You're good to go!`;
         } else if (statusText === 'rejected') {
-            title = `${requestType} Request Rejected ❌`;
-            body = `Your ${requestType.toLowerCase()} request has been rejected by HOD`;
+            title = `${requestType} Request Rejected`;
+            body = `Hi ${studentName}, your ${requestType.toLowerCase()} request has been rejected by HOD. Please contact your department for more details.`;
         } else {
-            title = `${requestType} Request Updated`;
-            body = `Your ${requestType.toLowerCase()} request status: ${newStatus} by HOD`;
+            title = `${requestType} Request Update`;
+            body = `Hi ${studentName}, your ${requestType.toLowerCase()} request status has been updated by HOD.`;
         }
     } else {
         // Staff actions
         if (statusText === 'approved' || statusText === 'accepted' || statusText === 'forwarded') {
-            title = `${requestType} Request Forwarded 📤`;
-            body = `Your ${requestType.toLowerCase()} request has been forwarded by Staff to HOD for approval`;
+            title = `${requestType} Request Forwarded`;
+            body = `Hi ${studentName}, your ${requestType.toLowerCase()} request has been forwarded to HOD for final approval.`;
         } else if (statusText === 'rejected') {
-            title = `${requestType} Request Rejected ❌`;
-            body = `Your ${requestType.toLowerCase()} request has been rejected by Staff`;
+            title = `${requestType} Request Rejected`;
+            body = `Hi ${studentName}, your ${requestType.toLowerCase()} request has been rejected by Staff. Please contact your class incharge for details.`;
         } else {
-            title = `${requestType} Request Updated`;
-            body = `Your ${requestType.toLowerCase()} request status: ${newStatus} by Staff`;
+            title = `${requestType} Request Update`;
+            body = `Hi ${studentName}, your ${requestType.toLowerCase()} request status has been updated by Staff.`;
         }
     }
 
