@@ -127,9 +127,9 @@ const notifyStaffOnNewRequest = async (request, requestType) => {
 
         // Find ALL staff for this department/year/section
         const staffList = await Staff.find({
-            department: request.department,
-            year: request.year,
-            sec: request.section
+            department: new RegExp(`^${request.department}$`, 'i'),
+            year: new RegExp(`^${request.year}$`, 'i'),
+            sec: new RegExp(`^${request.section}$`, 'i')
         });
 
         if (!staffList || staffList.length === 0) {
@@ -249,6 +249,7 @@ const notifyStudentOnStatusChange = async (request, requestType, newStatus, appr
         console.log(`Notifying student ${studentEmail}: ${title} - ${body}`);
         return await sendNotificationToUser(studentEmail, title, body, data);
     }
+    console.warn(`No student email found for request ${request._id}`);
     return { success: false, message: 'No student email found' };
 };
 
@@ -288,23 +289,26 @@ const notifyStaffOnHODDecision = async (request, requestType, status) => {
 
         console.log(`Notifying staff about HOD decision for: dept=${request.department}, year=${request.year}, sec=${request.section}`);
 
-        // Find ALL staff for this department/year/section
+        // Find ALL staff for this department/year/section (Case Insensitive)
         const staffList = await Staff.find({
-            department: request.department,
-            year: request.year,
-            sec: request.section
+            department: new RegExp(`^${request.department}$`, 'i'),
+            year: new RegExp(`^${request.year}$`, 'i'),
+            sec: new RegExp(`^${request.section}$`, 'i')
         });
 
         if (!staffList || staffList.length === 0) {
-            console.log(`No staff found to notify about HOD decision.`);
+            console.log(`No staff found to notify about HOD decision (Dept: ${request.department}, Year: ${request.year}, Sec: ${request.section}).`);
             return { success: false, message: 'No staff found' };
         }
 
         const staffWithTokens = staffList.filter(s => s.fcmToken);
 
         if (staffWithTokens.length === 0) {
+            console.log(`Found ${staffList.length} staff members, but none have FCM tokens.`);
             return { success: false, message: 'No staff have FCM tokens' };
         }
+
+        console.log(`Found ${staffWithTokens.length} staff members with FCM tokens.`);
 
         const results = [];
         for (const staff of staffWithTokens) {
