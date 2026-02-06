@@ -80,10 +80,14 @@ const sendNotificationToToken = async (token, title, body, data = {}) => {
 const sendNotificationToUser = async (userEmail, title, body, data = {}) => {
     try {
         // Find user in all collections (User, Staff, HOD) and get their FCM token
-        const emailLower = userEmail.toLowerCase();
+        const emailLower = userEmail.toLowerCase().trim();
         console.log(`Looking for user with email: ${emailLower}`);
 
-        let user = await User.findOne({ email: emailLower });
+        // Escape regex special chars for safety
+        const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const emailRegex = new RegExp(`^${escapeRegExp(emailLower)}$`, 'i');
+
+        let user = await User.findOne({ email: emailRegex });
         let userType = 'Student';
 
         if (!user) {
