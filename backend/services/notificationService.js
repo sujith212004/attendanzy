@@ -36,13 +36,49 @@ initializeFirebase();
  * @param {string} body - Notification body
  * @param {object} data - Additional data to send with notification
  */
-const sendNotificationToUser = async (userEmail, title, body, data = {}) => {
+/**
+ * Send notification directly to an FCM token
+ * @param {string} token - The FCM token
+ * @param {string} title - Notification title
+ * @param {string} body - Notification body
+ * @param {object} data - Additional data
+ */
+const sendNotificationToToken = async (token, title, body, data = {}) => {
     try {
         if (!firebaseInitialized) {
             console.log('Firebase not initialized. Skipping notification.');
             return { success: false, message: 'Firebase not initialized' };
         }
 
+        const message = {
+            notification: {
+                title: title,
+                body: body
+            },
+            data: {
+                ...data,
+                click_action: 'FLUTTER_NOTIFICATION_CLICK'
+            },
+            token: token
+        };
+
+        const response = await admin.messaging().send(message);
+        return { success: true, messageId: response };
+    } catch (error) {
+        console.error('Error sending notification to token:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Send notification to a specific user by email
+ * @param {string} userEmail - The email of the user to send notification to
+ * @param {string} title - Notification title
+ * @param {string} body - Notification body
+ * @param {object} data - Additional data to send with notification
+ */
+const sendNotificationToUser = async (userEmail, title, body, data = {}) => {
+    try {
         // Find user in all collections (User, Staff, HOD) and get their FCM token
         const emailLower = userEmail.toLowerCase();
         console.log(`Looking for user with email: ${emailLower}`);
@@ -86,21 +122,11 @@ const sendNotificationToUser = async (userEmail, title, body, data = {}) => {
             return { success: false, message: 'FCM token not found' };
         }
 
-        const message = {
-            notification: {
-                title: title,
-                body: body
-            },
-            data: {
-                ...data,
-                click_action: 'FLUTTER_NOTIFICATION_CLICK'
-            },
-            token: user.fcmToken
-        };
-
-        const response = await admin.messaging().send(message);
-        console.log(`Notification sent to ${userEmail}:`, response);
-        return { success: true, messageId: response };
+        const result = await sendNotificationToToken(user.fcmToken, title, body, data);
+        if (result.success) {
+            console.log(`Notification sent to ${userEmail}:`, result.messageId);
+        }
+        return result;
     } catch (error) {
         console.error(`Error sending notification to ${userEmail}:`, error);
         return { success: false, error: error.message };
@@ -126,10 +152,13 @@ const notifyStaffOnNewRequest = async (request, requestType) => {
         console.log(`Looking for staff: dept=${request.department}, year=${request.year}, sec=${request.section}`);
 
         // Find ALL staff for this department/year/section
+        // Escape special regex characters to prevent errors
+        const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
         const staffList = await Staff.find({
-            department: new RegExp(`^${request.department}$`, 'i'),
-            year: new RegExp(`^${request.year}$`, 'i'),
-            sec: new RegExp(`^${request.section}$`, 'i')
+            department: new RegExp(`^${escapeRegExp(request.department.trim())}$`, 'i'),
+            year: new RegExp(`^${escapeRegExp(request.year.trim())}$`, 'i'),
+            sec: new RegExp(`^${escapeRegExp(request.section.trim())}$`, 'i')
         });
 
         if (!staffList || staffList.length === 0) {
@@ -151,7 +180,8 @@ const notifyStaffOnNewRequest = async (request, requestType) => {
         const results = [];
         for (const staff of staffWithTokens) {
             console.log(`Notifying staff ${staff.name} (${staff.email}) about new ${requestType} request`);
-            const result = await sendNotificationToUser(staff.email, title, body, data);
+            // Use token directly to avoid redundant lookup
+            const result = await sendNotificationToToken(staff.fcmToken, title, body, data);
             results.push({ email: staff.email, ...result });
         }
 
@@ -290,10 +320,13 @@ const notifyStaffOnHODDecision = async (request, requestType, status) => {
         console.log(`Notifying staff about HOD decision for: dept=${request.department}, year=${request.year}, sec=${request.section}`);
 
         // Find ALL staff for this department/year/section (Case Insensitive)
+        // Escape special regex characters to prevent errors
+        const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
         const staffList = await Staff.find({
-            department: new RegExp(`^${request.department}$`, 'i'),
-            year: new RegExp(`^${request.year}$`, 'i'),
-            sec: new RegExp(`^${request.section}$`, 'i')
+            department: new RegExp(`^${escapeRegExp(request.department.trim())}$`, 'i'),
+            year: new RegExp(`^${escapeRegExp(request.year.trim())}$`, 'i'),
+            sec: new RegExp(`^${escapeRegExp(request.section.trim())}$`, 'i')
         });
 
         if (!staffList || staffList.length === 0) {
@@ -313,7 +346,8 @@ const notifyStaffOnHODDecision = async (request, requestType, status) => {
         const results = [];
         for (const staff of staffWithTokens) {
             console.log(`Notifying staff ${staff.name} about HOD decision`);
-            const result = await sendNotificationToUser(staff.email, title, body, data);
+            // Use token directly to avoid redundant lookup
+            const result = await sendNotificationToToken(staff.fcmToken, title, body, data);
             results.push({ email: staff.email, ...result });
         }
 

@@ -319,12 +319,14 @@ exports.updateHODStatus = async (req, res) => {
             console.error('Student HOD notification error:', notifError);
         }
 
-        // Notify staff about HOD decision
+        // Notify staff about HOD decision - DISABLED as per new requirement (Student only)
+        /*
         try {
             await notifyStaffOnHODDecision(leaveRequest, 'Leave', status);
         } catch (notifError) {
             console.error('Staff HOD notification error:', notifError);
         }
+        */
 
         res.status(200).json({
             success: true,
