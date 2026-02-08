@@ -3,6 +3,9 @@ const Staff = require('../models/Staff');
 const HOD = require('../models/HOD');
 
 // Login controller
+// Login controller
+const { pool } = require('../config/pg');
+
 exports.login = async (req, res) => {
     try {
         const { email, password, role, department } = req.body;
@@ -15,36 +18,75 @@ exports.login = async (req, res) => {
             });
         }
 
-        // Determine which collection to query based on role
-        let Model;
-        let collectionName;
+        let user = null;
+        let query = '';
+        const lowerRole = role.toLowerCase();
 
-        if (role.toLowerCase() === 'user') {
-            Model = User;
-            collectionName = 'profile';
-        } else if (role.toLowerCase() === 'staff') {
-            Model = Staff;
-            collectionName = 'Staff';
-        } else if (role.toLowerCase() === 'hod') {
-            Model = HOD;
-            collectionName = 'HOD';
+        if (lowerRole === 'staff') {
+            // Check Staff table
+            query = `
+                SELECT * FROM staff 
+                WHERE LOWER(email) = LOWER($1)
+                AND password = $2
+                AND department = $3
+            `;
+            const result = await pool.query(query, [email, password, department]);
+            user = result.rows[0];
+
+        } else if (lowerRole === 'hod') {
+            // Check HOD table
+            query = `
+                SELECT * FROM hod 
+                WHERE LOWER(email) = LOWER($1)
+                AND password = $2
+                AND department = $3
+            `;
+            const result = await pool.query(query, [email, password, department]);
+            user = result.rows[0];
+
+        } else if (lowerRole === 'user') {
+            // Check Student tables (dynamic cse_*, etc.)
+            // First, find all valid student tables
+            // Note: In a real scenario with year/sec, we could target specific table
+            const tablesResult = await pool.query(`
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name LIKE 'cse_%' 
+            `); // Assuming student tables start with department prefix like cse_
+
+            // Iterate through possible student tables to find the user
+            // Optimization: If department is 'CSE', only check 'cse_%' tables.
+            // Map department to table prefix if needed.
+
+            const studentTables = tablesResult.rows.map(r => r.table_name);
+
+            for (const table of studentTables) {
+                query = `
+                    SELECT *, '${table}' as source_table FROM "${table}" 
+                    WHERE LOWER(email) = LOWER($1)
+                    AND password = $2
+                    -- AND department = $3 -- Table implies dept usually, but can check if column exists
+                `;
+
+                try {
+                    const result = await pool.query(query, [email, password]);
+                    if (result.rows.length > 0) {
+                        user = result.rows[0];
+                        // Normalize year/sec from table name if needed or assume columns exist
+                        break;
+                    }
+                } catch (err) {
+                    // Ignore errors (e.g. column mismatch) and continue to next table
+                    // console.warn(`Skipping table ${table} due to error: ${err.message}`);
+                }
+            }
         } else {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid role',
             });
         }
-
-        // Find user with case-insensitive email match
-        const user = await Model.findOne({
-            $or: [
-                { email: new RegExp(`^${email}$`, 'i') },
-                { 'College Email': new RegExp(`^${email}$`, 'i') }
-            ],
-            password: password,
-            role: role.toLowerCase(),
-            department: department,
-        });
 
         if (!user) {
             return res.status(401).json({
@@ -55,24 +97,25 @@ exports.login = async (req, res) => {
 
         // Prepare user data for response
         const userData = {
-            email: user.email || user['College Email'] || '',
-            name: user.name || user.Name || '',
-            role: role.toLowerCase(),
-            department: user.department,
-            isStaff: role.toLowerCase() === 'staff' || role.toLowerCase() === 'hod',
+            email: user.email || user.college_email || '',
+            name: user.name || '',
+            role: lowerRole,
+            department: user.department || department, // Fallback to input dept if table doesn't have it
+            isStaff: lowerRole === 'staff' || lowerRole === 'hod',
         };
 
         // Add year and section for users and staff
-        if (role.toLowerCase() === 'user') {
+        if (lowerRole === 'user') {
             userData.year = user.year || '';
             userData.sec = user.sec || '';
+            userData.rollNumber = user.roll_number || '';
         }
 
-        if (role.toLowerCase() === 'staff') {
-            userData.year = user.year || '';
+        if (lowerRole === 'staff') {
+            userData.year = user.year || ''; // Staff table might have these or not
             userData.sec = user.sec || '';
-            userData.staffName = user.name || user.Name || '';
-            userData.inchargeName = user.inchargeName || user.incharge || '';
+            userData.staffName = user.name || '';
+            userData.inchargeName = user.incharge_name || '';
         }
 
         // Return success response
@@ -156,6 +199,7 @@ exports.changePassword = async (req, res) => {
 };
 
 // Get user profile
+// Get user profile
 exports.getProfile = async (req, res) => {
     try {
         const { email, role } = req.query;
@@ -167,26 +211,49 @@ exports.getProfile = async (req, res) => {
             });
         }
 
-        let Model;
-        if (role.toLowerCase() === 'user') {
-            Model = User;
-        } else if (role.toLowerCase() === 'staff') {
-            Model = Staff;
-        } else if (role.toLowerCase() === 'hod') {
-            Model = HOD;
+        let user = null;
+        const lowerRole = role.toLowerCase();
+        let query = '';
+
+        if (lowerRole === 'staff') {
+            query = `SELECT * FROM staff WHERE LOWER(email) = LOWER($1)`;
+            const result = await pool.query(query, [email]);
+            user = result.rows[0];
+
+        } else if (lowerRole === 'hod') {
+            query = `SELECT * FROM hod WHERE LOWER(email) = LOWER($1)`;
+            const result = await pool.query(query, [email]);
+            user = result.rows[0];
+
+        } else if (lowerRole === 'user') {
+            // Check all student tables
+            const tablesResult = await pool.query(`
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name LIKE 'cse_%' 
+            `);
+
+            const studentTables = tablesResult.rows.map(r => r.table_name);
+
+            for (const table of studentTables) {
+                query = `SELECT *, '${table}' as source_table FROM "${table}" WHERE LOWER(email) = LOWER($1)`;
+                try {
+                    const result = await pool.query(query, [email]);
+                    if (result.rows.length > 0) {
+                        user = result.rows[0];
+                        break;
+                    }
+                } catch (err) {
+                    // Continue to next table
+                }
+            }
         } else {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid role',
             });
         }
-
-        const user = await Model.findOne({
-            $or: [
-                { email: new RegExp(`^${email}$`, 'i') },
-                { 'College Email': new RegExp(`^${email}$`, 'i') }
-            ],
-        });
 
         if (!user) {
             return res.status(404).json({
