@@ -1,4 +1,4 @@
-FROM node:18-alpine AS base
+FROM node:25-alpine AS base
 
 # Security: Run as non-root user
 RUN addgroup -g 1001 -S nodejs && \
