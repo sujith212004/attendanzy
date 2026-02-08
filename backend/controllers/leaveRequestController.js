@@ -1,5 +1,5 @@
 const LeaveRequest = require('../models/LeaveRequest');
-const { notifyStaffOnNewRequest, notifyHODOnForward, notifyStudentOnStatusChange } = require('../services/notificationService');
+const { notifyStaffOnNewRequest, notifyHODOnForward, notifyStudentOnStatusChange, notifyStaffOnHODDecision } = require('../services/notificationService');
 
 // Submit Leave Request
 exports.submitLeaveRequest = async (req, res) => {
@@ -190,7 +190,10 @@ exports.updateStaffStatus = async (req, res) => {
         // Backend DB expects 'approved' or 'rejected' (or 'pending').
 
         if (!status || !['accepted', 'rejected', 'approved'].includes(status)) {
-            // Invalid status
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid status. Must be "accepted", "rejected", or "approved"',
+            });
         }
 
         let dbStatus = status;
@@ -315,6 +318,15 @@ exports.updateHODStatus = async (req, res) => {
         } catch (notifError) {
             console.error('Student HOD notification error:', notifError);
         }
+
+        // Notify staff about HOD decision - DISABLED as per new requirement (Student only)
+        /*
+        try {
+            await notifyStaffOnHODDecision(leaveRequest, 'Leave', status);
+        } catch (notifError) {
+            console.error('Staff HOD notification error:', notifError);
+        }
+        */
 
         res.status(200).json({
             success: true,
