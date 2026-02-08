@@ -16,7 +16,18 @@ try {
 const app = express();
 
 // Connect to MongoDB
+// Connect to MongoDB
 connectDB();
+
+// Test PostgreSQL connection
+const { pool } = require('./config/pg');
+pool.query('SELECT NOW()', (err, res) => {
+    if (err) {
+        console.error('❌ PostgreSQL connection failed:', err.message);
+    } else {
+        console.log('✅ PostgreSQL Connected');
+    }
+});
 
 // ============================================
 // Security Middleware (Production)
@@ -24,31 +35,31 @@ connectDB();
 if (security && process.env.NODE_ENV === 'production') {
     // Helmet for security headers
     app.use(security.helmet());
-    
+
     // Rate limiting
     app.use(security.rateLimiter());
-    
+
     // CORS with whitelist
     app.use(security.cors());
-    
+
     // Prevent NoSQL injection
     app.use(security.mongoSanitize());
-    
+
     // Prevent XSS attacks
     app.use(security.xss());
-    
+
     // Prevent HTTP Parameter Pollution
     app.use(security.hpp());
-    
+
     // Security headers
     app.use(security.securityHeaders);
-    
+
     // Input validation
     app.use(security.validateInput);
-    
+
     // Audit logging
     app.use(security.auditLog);
-    
+
     console.log('🔒 Production security middleware enabled');
 } else {
     // Development CORS - allow all origins
