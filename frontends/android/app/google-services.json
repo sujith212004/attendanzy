@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "972991022931",
+    "project_id": "attendanzy",
+    "storage_bucket": "attendanzy.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:972991022931:android:398ed527a37129bb2b83a6",
+        "android_client_info": {
+          "package_name": "com.example.flutter_attendence_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC59kyBvzrWAiOLZquecyEZEHd9pwutIxQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
