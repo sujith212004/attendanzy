@@ -86,6 +86,27 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// Database status route
+app.get('/api/db-status', (req, res) => {
+    const mongoose = require('mongoose');
+    const dbState = {
+        0: 'disconnected',
+        1: 'connected',
+        2: 'connecting',
+        3: 'disconnecting'
+    };
+    
+    res.status(200).json({
+        success: true,
+        database: {
+            state: dbState[mongoose.connection.readyState] || 'unknown',
+            host: mongoose.connection.host || 'N/A',
+            name: mongoose.connection.name || 'N/A',
+        },
+        timestamp: new Date().toISOString(),
+    });
+});
+
 // Root route
 app.get('/', (req, res) => {
     res.status(200).json({
@@ -98,6 +119,8 @@ app.get('/', (req, res) => {
             leaveRequests: '/api/leave-requests',
             notifications: '/api/notifications',
             health: '/api/health',
+            dbStatus: '/api/db-status',
+            testOD: '/api/od-requests/student/test@example.com (for testing)',
         },
     });
 });
