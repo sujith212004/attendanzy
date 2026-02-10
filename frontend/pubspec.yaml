@@ -61,6 +61,8 @@ dependencies:
   flutter_native_splash: ^2.4.4
   confetti: ^0.7.0
   flutter_local_notifications: ^18.0.1
+  flutter_bloc: ^9.1.1
+  equatable: ^2.0.8
 
   
   

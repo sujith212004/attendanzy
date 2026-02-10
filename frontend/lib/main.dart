@@ -1,23 +1,26 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_attendence_app/attendancedetails.dart';
-import 'package:flutter_attendence_app/firebase_api.dart';
-import 'package:flutter_attendence_app/firebase_options.dart';
-import 'package:flutter_attendence_app/gpa_calculator.dart';
-import 'package:flutter_attendence_app/homepage.dart';
-import 'package:flutter_attendence_app/attendance.dart';
-import 'package:flutter_attendence_app/loginpage.dart';
-import 'package:flutter_attendence_app/odrequestpage.dart';
-import 'package:flutter_attendence_app/profile_page.dart';
-import 'package:flutter_attendence_app/timetable_page.dart';
-import 'package:flutter_attendence_app/attendancemark.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'features/attendance/presentation/pages/attendancedetails.dart';
+import 'core/services/firebase_api.dart';
+import 'core/config/firebase_options.dart';
+import 'features/academics/presentation/pages/gpa_calculator.dart';
+import 'features/home/presentation/pages/homepage.dart';
+import 'features/attendance/presentation/pages/attendance.dart';
+import 'features/auth/presentation/pages/loginpage.dart';
+import 'features/od/presentation/pages/odrequestpage.dart';
+import 'features/home/presentation/pages/profile_page.dart';
+import 'features/academics/presentation/pages/timetable_page.dart';
+import 'features/attendance/presentation/pages/attendancemark.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'package:flutter_attendence_app/widgets/minimal_splash.dart';
+import 'core/widgets/minimal_splash.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+// BLoC imports
+import 'core/bloc/app_bloc_providers.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<_MyAppState> myAppKey = GlobalKey<_MyAppState>();
@@ -37,13 +40,10 @@ void main() async {
     print('Firebase initialization error: $e');
   }
 
-  // Initialize notifications BEFORE running the app to ensure handlers are registered
-  try {
-    await FirebaseApi().initNotifications();
-    print('✅ Notifications initialized successfully');
-  } catch (e) {
-    print('❌ Error initializing notifications: $e');
-  }
+  // Initialize notifications in background (non-blocking) to prevent splash freeze
+  FirebaseApi().initNotifications().catchError((e) {
+    print('Error initializing notifications: $e');
+  });
 
   final userExists = await _checkUserSession();
   final isStaff = await _getUserRole();
@@ -204,91 +204,93 @@ class _MyAppState extends State<MyApp> {
       });
     }
 
-    return MaterialApp(
-      navigatorKey: navigatorKey,
-      debugShowCheckedModeBanner: false,
-      title: 'Attendance App',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home:
-          _showPostSplash
-              ? MinimalSplashAnimation(
-                onComplete: _onPostSplashComplete,
-                duration: const Duration(milliseconds: 3800),
-              )
-              : (widget.userExists
-                  ? FutureBuilder<Map<String, dynamic>?>(
-                    future: _userDataFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Scaffold(
-                          body: Center(child: CircularProgressIndicator()),
+    return AppBlocProviders(
+      child: MaterialApp(
+        navigatorKey: navigatorKey,
+        debugShowCheckedModeBanner: false,
+        title: 'Attendance App',
+        theme: ThemeData(primarySwatch: Colors.blue),
+        home:
+            _showPostSplash
+                ? MinimalSplashAnimation(
+                  onComplete: _onPostSplashComplete,
+                  duration: const Duration(milliseconds: 3800),
+                )
+                : (widget.userExists
+                    ? FutureBuilder<Map<String, dynamic>?>(
+                      future: _userDataFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Scaffold(
+                            body: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        if (!snapshot.hasData || snapshot.data == null) {
+                          return const LoginPage();
+                        }
+                        final userData = snapshot.data!;
+                        return HomePage(
+                          name: userData['name'] ?? 'User',
+                          email: userData['email'] ?? '',
+                          profile: userData['profile'] ?? {},
+                          isStaff: userData['isStaff'] ?? false,
+                          role: userData['role'] ?? 'user',
                         );
-                      }
-                      if (!snapshot.hasData || snapshot.data == null) {
-                        return const LoginPage();
-                      }
-                      final userData = snapshot.data!;
-                      return HomePage(
-                        name: userData['name'] ?? 'User',
-                        email: userData['email'] ?? '',
-                        profile: userData['profile'] ?? {},
-                        isStaff: userData['isStaff'] ?? false,
-                        role: userData['role'] ?? 'user',
-                      );
-                    },
-                  )
-                  : const LoginPage()),
-      initialRoute: null,
-      routes: {
-        '/loginpage': (context) => const LoginPage(),
-        '/homepage':
-            (context) => FutureBuilder<Map<String, dynamic>?>(
-              future: _userDataFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
+                      },
+                    )
+                    : const LoginPage()),
+        initialRoute: null,
+        routes: {
+          '/loginpage': (context) => const LoginPage(),
+          '/homepage':
+              (context) => FutureBuilder<Map<String, dynamic>?>(
+                future: _userDataFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Scaffold(
+                      body: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  if (!snapshot.hasData || snapshot.data == null) {
+                    return const LoginPage();
+                  }
+                  final userData = snapshot.data!;
+                  return HomePage(
+                    name: userData['name'] ?? 'User',
+                    email: userData['email'] ?? '',
+                    profile: userData['profile'] ?? {},
+                    isStaff: userData['isStaff'] ?? false,
+                    role: userData['role'] ?? 'user',
                   );
-                }
-                if (!snapshot.hasData || snapshot.data == null) {
-                  return const LoginPage();
-                }
-                final userData = snapshot.data!;
-                return HomePage(
-                  name: userData['name'] ?? 'User',
-                  email: userData['email'] ?? '',
-                  profile: userData['profile'] ?? {},
-                  isStaff: userData['isStaff'] ?? false,
-                  role: userData['role'] ?? 'user',
-                );
-              },
-            ),
-        '/attendancepage': (context) => const AttendanceSelectionPage(),
-        '/attendancemark': (context) => const AttendanceScreen(),
-        '/attendancedetails':
-            (context) => AttendanceDetailsScreen(
-              department: 'Default Department',
-              year: 'Default Year',
-              section: 'Default Section',
-              presentStudents: [],
-              absentStudents: [],
-              onDutyStudents: [],
-              onEdit: (Map<String, bool> updatedAttendance) {
-                print(updatedAttendance);
-              },
-            ),
-        '/profilepage':
-            (context) => const ProfilePage(
-              name: 'Default Name',
-              email: 'default@example.com',
-              department: 'Default Department',
-              year: 'Default Year',
-              section: 'Default Section',
-            ),
-        '/ ': (context) => const GPACalculatorPage(),
-        '/timetablepage': (context) => TimetablePage(),
-        '/odrequestpage': (context) => const ODRequestPage(),
-      },
+                },
+              ),
+          '/attendancepage': (context) => const AttendanceSelectionPage(),
+          '/attendancemark': (context) => const AttendanceScreen(),
+          '/attendancedetails':
+              (context) => AttendanceDetailsScreen(
+                department: 'Default Department',
+                year: 'Default Year',
+                section: 'Default Section',
+                presentStudents: [],
+                absentStudents: [],
+                onDutyStudents: [],
+                onEdit: (Map<String, bool> updatedAttendance) {
+                  print(updatedAttendance);
+                },
+              ),
+          '/profilepage':
+              (context) => const ProfilePage(
+                name: 'Default Name',
+                email: 'default@example.com',
+                department: 'Default Department',
+                year: 'Default Year',
+                section: 'Default Section',
+              ),
+          '/ ': (context) => const GPACalculatorPage(),
+          '/timetablepage': (context) => TimetablePage(),
+          '/odrequestpage': (context) => const ODRequestPage(),
+        },
+      ),
     );
   }
 }
