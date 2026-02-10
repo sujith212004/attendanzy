@@ -118,12 +118,12 @@ class FirebaseApi {
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           print('Local notification tapped: ${response.payload}');
           _handleNotificationTap(
-            RemoteMessage(data: json.decode(response.payload ?? '{}'))
+            RemoteMessage(data: json.decode(response.payload ?? '{}')),
           );
         },
         onDidReceiveBackgroundNotificationResponse: _notificationTapBackground,
       );
-      
+
       print('Local notifications initialized: $result');
 
       // Create high-priority notification channel for Android
@@ -138,11 +138,13 @@ class FirebaseApi {
       );
 
       final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
-          _localNotifications.resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
+          _localNotifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
 
       await androidPlugin?.createNotificationChannel(channel);
-      
+
       print('✅ Android notification channel created');
     } catch (e) {
       print('❌ Error initializing local notifications: $e');
@@ -164,11 +166,15 @@ class FirebaseApi {
 
     try {
       // Show local notification when app is in foreground
-      final title = message.notification?.title ?? message.data['title'] ?? 'Attendanzy';
-      final body = message.notification?.body ?? message.data['body'] ?? 'New notification';
-      
+      final title =
+          message.notification?.title ?? message.data['title'] ?? 'Attendanzy';
+      final body =
+          message.notification?.body ??
+          message.data['body'] ??
+          'New notification';
+
       print('   Displaying: $title - $body');
-      
+
       _showLocalNotification(
         title: title,
         body: body,
@@ -196,7 +202,8 @@ class FirebaseApi {
           AndroidNotificationDetails(
             'attendanzy_notifications',
             'Attendanzy Notifications',
-            channelDescription: 'Notifications for leave and OD request updates',
+            channelDescription:
+                'Notifications for leave and OD request updates',
             importance: Importance.high,
             priority: Priority.high,
             icon: '@mipmap/ic_launcher',
@@ -216,8 +223,10 @@ class FirebaseApi {
         iOS: iosDetails,
       );
 
-      final notificationId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
-      
+      final notificationId = DateTime.now().millisecondsSinceEpoch.remainder(
+        100000,
+      );
+
       await _localNotifications.show(
         notificationId,
         title,
@@ -225,7 +234,7 @@ class FirebaseApi {
         notificationDetails,
         payload: payload,
       );
-      
+
       print('✅ Local notification displayed (ID: $notificationId)');
     } catch (e) {
       print('❌ Error showing local notification: $e');
@@ -262,20 +271,20 @@ class FirebaseApi {
   Future<void> updateTokenForUser(String email) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // ALWAYS get fresh token from Firebase (don't use cached)
       // This ensures the correct device token is used
       print('Fetching fresh FCM token from Firebase for device...');
       String? token = await _firebaseMessaging.getToken();
-      
+
       if (token != null && token.isNotEmpty) {
         // Save to prefs
         await prefs.setString('fcm_token', token);
-        
+
         print('Updating FCM token for: $email');
         print('Token (first 50 chars): ${token.substring(0, 50)}...');
         print('API URL: $_apiBaseUrl/notifications/update-token');
-        
+
         final response = await http.post(
           Uri.parse('$_apiBaseUrl/notifications/update-token'),
           headers: {'Content-Type': 'application/json'},
@@ -283,7 +292,7 @@ class FirebaseApi {
         );
 
         print('FCM update response: ${response.statusCode} - ${response.body}');
-        
+
         if (response.statusCode == 200) {
           print('✅ FCM token updated successfully for: $email');
         } else {

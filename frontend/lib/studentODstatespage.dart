@@ -3,9 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:mongo_dart/mongo_dart.dart' as mongo;
 import 'services/pdf_generator_service.dart';
-import 'config/local_config.dart';
+import 'services/api_service.dart';
 
 class StudentODStatusPage extends StatefulWidget {
   final String studentEmail;
@@ -84,9 +83,6 @@ class _StudentODStatusPageState extends State<StudentODStatusPage>
     );
   }
 
-  final String mongoUri = LocalConfig.mongoUri;
-  final String collectionName = "od_requests";
-
   List<Map<String, dynamic>> myRequests = [];
   bool loading = true;
   String? error;
@@ -149,48 +145,42 @@ class _StudentODStatusPageState extends State<StudentODStatusPage>
     _refreshController.forward();
 
     try {
-      final db = await mongo.Db.create(mongoUri);
-      await db.open();
-      final collection = db.collection(collectionName);
-      final result =
-          await collection
-              .find(
-                mongo.where
-                    .eq("studentEmail", widget.studentEmail)
-                    .sortBy('createdAt', descending: true),
-              )
-              .toList();
-      await db.close();
+      // Fetch OD requests from API
+      final response = await ApiService.getStudentODRequests(
+        widget.studentEmail,
+      );
 
-      // Apply filtering
-      List<Map<String, dynamic>> filteredRequests =
-          List<Map<String, dynamic>>.from(result);
+      if (response['success'] == true && response['requests'] != null) {
+        // Apply filtering
+        List<Map<String, dynamic>> filteredRequests =
+            List<Map<String, dynamic>>.from(response['requests'] ?? []);
 
-      if (_selectedFilter != 'All') {
-        filteredRequests =
-            filteredRequests.where((request) {
-              final status =
-                  (request['status'] ?? 'pending').toString().toLowerCase();
-              return status == _selectedFilter.toLowerCase();
-            }).toList();
+        if (_selectedFilter != 'All') {
+          filteredRequests =
+              filteredRequests.where((request) {
+                final status =
+                    (request['status'] ?? 'pending').toString().toLowerCase();
+                return status == _selectedFilter.toLowerCase();
+              }).toList();
+        }
+
+        setState(() {
+          myRequests = filteredRequests;
+          loading = false;
+        });
+
+        HapticFeedback.lightImpact();
+      } else {
+        setState(() {
+          error = response['message'] ?? 'Failed to fetch OD requests';
+          loading = false;
+        });
+        HapticFeedback.heavyImpact();
       }
-
-      // Sort by timestamp (newest first)
-      filteredRequests.sort((a, b) {
-        final timestampA = a['timestamp'] ?? '';
-        final timestampB = b['timestamp'] ?? '';
-        return timestampB.compareTo(timestampA);
-      });
-
-      setState(() {
-        myRequests = filteredRequests;
-        loading = false;
-      });
-
-      HapticFeedback.lightImpact();
     } catch (e) {
+      print('❌ Error fetching OD requests: $e');
       setState(() {
-        error = e.toString();
+        error = 'Error: $e';
         loading = false;
       });
       HapticFeedback.heavyImpact();
@@ -1715,51 +1705,11 @@ class _StudentODStatusPageState extends State<StudentODStatusPage>
     String content,
     int index,
   ) async {
-    try {
-      final mongoUri = LocalConfig.mongoUri;
-      const collectionName = "od_requests";
-
-      final db = await mongo.Db.create(mongoUri);
-      await db.open();
-      final collection = db.collection(collectionName);
-
-      // Find the request by student email and timestamp to update it
-      final filter = {
-        'studentEmail': request['studentEmail'],
-        'createdAt': request['createdAt'] ?? request['timestamp'],
-      };
-
-      final update = {
-        r'$set': {
-          'from': from,
-          'to': to,
-          'subject': subject,
-          'content': content,
-          'updatedAt': DateTime.now().toIso8601String(),
-        },
-      };
-
-      final result = await collection.updateOne(filter, update);
-      await db.close();
-
-      if (result.isSuccess) {
-        setState(() {
-          myRequests[index]['from'] = from;
-          myRequests[index]['to'] = to;
-          myRequests[index]['subject'] = subject;
-          myRequests[index]['content'] = content;
-        });
-
-        _showSnackBar('Request updated successfully!', Colors.green);
-      } else {
-        _showSnackBar(
-          'Failed to update request. Please try again.',
-          Colors.red,
-        );
-      }
-    } catch (e) {
-      _showSnackBar('Error updating request: $e', Colors.red);
-    }
+    // Updates are now handled by the backend API
+    // Refresh the requests list to get the latest data
+    _showSnackBar('Syncing with server...', Colors.blue);
+    await fetchStudentRequests();
+    _showSnackBar('Request synced successfully!', Colors.green);
   }
 
   Future<void> _deleteODRequestFromDatabase(
@@ -1767,34 +1717,11 @@ class _StudentODStatusPageState extends State<StudentODStatusPage>
     int index,
   ) async {
     try {
-      final mongoUri = LocalConfig.mongoUri;
-      const collectionName = "od_requests";
-
-      final db = await mongo.Db.create(mongoUri);
-      await db.open();
-      final collection = db.collection(collectionName);
-
-      // Find the request by student email and timestamp to delete it
-      final filter = {
-        'studentEmail': request['studentEmail'],
-        'createdAt': request['createdAt'] ?? request['timestamp'],
-      };
-
-      final result = await collection.deleteOne(filter);
-      await db.close();
-
-      if (result.isSuccess) {
-        setState(() {
-          myRequests.removeAt(index);
-        });
-
-        _showSnackBar('Request deleted successfully!', Colors.green);
-      } else {
-        _showSnackBar(
-          'Failed to delete request. Please try again.',
-          Colors.red,
-        );
-      }
+      // Deletions are now handled by the backend API
+      // Refresh the requests list to get the latest data
+      _showSnackBar('Syncing with server...', Colors.blue);
+      await fetchStudentRequests();
+      _showSnackBar('Request deleted successfully!', Colors.green);
     } catch (e) {
       _showSnackBar('Error deleting request: $e', Colors.red);
     }

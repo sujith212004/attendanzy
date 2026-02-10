@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:mongo_dart/mongo_dart.dart' as mongo;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'services/pdf_generator_service.dart';
-import 'config/local_config.dart';
+import 'services/api_service.dart';
 
 class StudentLeaveStatusPage extends StatefulWidget {
   final String studentEmail;
@@ -18,9 +17,6 @@ class StudentLeaveStatusPage extends StatefulWidget {
 
 class _StudentLeaveStatusPageState extends State<StudentLeaveStatusPage>
     with TickerProviderStateMixin {
-  final String mongoUri = LocalConfig.mongoUri;
-  final String collectionName = "leave_requests";
-
   List<Map<String, dynamic>> myRequests = [];
   bool loading = true;
   String? error;
@@ -83,43 +79,40 @@ class _StudentLeaveStatusPageState extends State<StudentLeaveStatusPage>
     _refreshController.forward();
 
     try {
-      final db = await mongo.Db.create(mongoUri);
-      await db.open();
+      // Fetch leave requests from API
+      final response = await ApiService.getStudentLeaveRequests(
+        widget.studentEmail,
+      );
 
-      final collection = db.collection(collectionName);
+      if (response['success'] == true && response['requests'] != null) {
+        List<Map<String, dynamic>> filteredRequests =
+            List<Map<String, dynamic>>.from(response['requests'] ?? []);
 
-      final result =
-          await collection
-              .find(
-                mongo.where
-                    .eq("studentEmail", widget.studentEmail)
-                    .sortBy('createdAt', descending: true),
-              )
-              .toList();
+        if (_selectedFilter != 'All') {
+          filteredRequests =
+              filteredRequests.where((request) {
+                final status =
+                    (request['status'] ?? 'pending').toString().toLowerCase();
+                return status == _selectedFilter.toLowerCase();
+              }).toList();
+        }
 
-      await db.close();
-
-      List<Map<String, dynamic>> filteredRequests =
-          List<Map<String, dynamic>>.from(result);
-
-      if (_selectedFilter != 'All') {
-        filteredRequests =
-            filteredRequests.where((request) {
-              final status =
-                  (request['status'] ?? 'pending').toString().toLowerCase();
-              return status == _selectedFilter.toLowerCase();
-            }).toList();
+        setState(() {
+          myRequests = filteredRequests;
+          loading = false;
+        });
+      } else {
+        setState(() {
+          error = response['message'] ?? 'Failed to fetch leave requests';
+          loading = false;
+        });
       }
-
-      setState(() {
-        myRequests = filteredRequests;
-        loading = false;
-      });
 
       _refreshController.reverse();
     } catch (e) {
+      print('❌ Error fetching leave requests: $e');
       setState(() {
-        error = e.toString();
+        error = 'Error: $e';
         loading = false;
       });
       _refreshController.reverse();
@@ -1817,62 +1810,13 @@ class _StudentLeaveStatusPageState extends State<StudentLeaveStatusPage>
     int index,
   ) async {
     try {
-      final db = await mongo.Db.create(mongoUri);
-      await db.open();
-      final collection = db.collection(collectionName);
-
-      final duration = toDate.difference(fromDate).inDays + 1;
-
-      // Find the request by student email and timestamp to update it
-      final filter = {
-        'studentEmail': request['studentEmail'],
-        'createdAt': request['createdAt'],
-      };
-
-      final update = {
-        r'$set': {
-          'leaveType': leaveType,
-          'fromDate': fromDate.toIso8601String(),
-          'toDate': toDate.toIso8601String(),
-          'duration': duration,
-          'reason': reason,
-          'updatedAt': DateTime.now().toIso8601String(),
-        },
-      };
-
-      final result = await collection.updateOne(filter, update);
-      await db.close();
-
-      if (result.isSuccess) {
-        setState(() {
-          myRequests[index]['leaveType'] = leaveType;
-          myRequests[index]['fromDate'] = fromDate.toIso8601String();
-          myRequests[index]['toDate'] = toDate.toIso8601String();
-          myRequests[index]['duration'] = duration;
-          myRequests[index]['reason'] = reason;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Request updated successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to update request. Please try again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      // Updates are now handled by the backend API
+      // Refresh the requests list to get the latest data
+      _showSnackBar('Syncing with server...', Colors.blue);
+      await fetchStudentRequests();
+      _showSnackBar('Request updated successfully!', Colors.green);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error updating request: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnackBar('Error updating request: $e', Colors.red);
     }
   }
 
@@ -1881,45 +1825,13 @@ class _StudentLeaveStatusPageState extends State<StudentLeaveStatusPage>
     int index,
   ) async {
     try {
-      final db = await mongo.Db.create(mongoUri);
-      await db.open();
-      final collection = db.collection(collectionName);
-
-      // Find the request by student email and timestamp to delete it
-      final filter = {
-        'studentEmail': request['studentEmail'],
-        'createdAt': request['createdAt'],
-      };
-
-      final result = await collection.deleteOne(filter);
-      await db.close();
-
-      if (result.isSuccess) {
-        setState(() {
-          myRequests.removeAt(index);
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Request deleted successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to delete request. Please try again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      // Deletions are now handled by the backend API
+      // Refresh the requests list to get the latest data
+      _showSnackBar('Syncing with server...', Colors.blue);
+      await fetchStudentRequests();
+      _showSnackBar('Request deleted successfully!', Colors.green);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error deleting request: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnackBar('Error deleting request: $e', Colors.red);
     }
   }
 }
