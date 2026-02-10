@@ -1,5 +1,4 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -14,8 +13,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class FirebaseApi {
   final _firebaseMessaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications =
-      FlutterLocalNotificationsPlugin();
 
   // API base URL from centralized config
   static String get _apiBaseUrl => ApiConfig.baseUrl;
@@ -38,9 +35,6 @@ class FirebaseApi {
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
-        // Initialize local notifications for foreground
-        await _initLocalNotifications();
-
         // Get the device token
         try {
           final token = await _firebaseMessaging.getToken();
@@ -97,61 +91,11 @@ class FirebaseApi {
     }
   }
 
-  Future<void> _initLocalNotifications() async {
-    try {
-      const AndroidInitializationSettings androidSettings =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
-
-      const DarwinInitializationSettings iosSettings =
-          DarwinInitializationSettings(
-            requestAlertPermission: true,
-            requestBadgePermission: true,
-            requestSoundPermission: true,
-          );
-
-      const InitializationSettings initSettings = InitializationSettings(
-        android: androidSettings,
-        iOS: iosSettings,
-      );
-
-      await _localNotifications.initialize(
-        initSettings,
-        onDidReceiveNotificationResponse: (NotificationResponse response) {
-          print('Local notification tapped: ${response.payload}');
-          // Handle notification tap
-        },
-      );
-
-      // Create notification channel for Android
-      const AndroidNotificationChannel channel = AndroidNotificationChannel(
-        'attendanzy_notifications',
-        'Attendanzy Notifications',
-        description: 'Notifications for leave and OD request updates',
-        importance: Importance.high,
-      );
-
-      await _localNotifications
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.createNotificationChannel(channel);
-    } catch (e) {
-      print('Error initializing local notifications: $e');
-    }
-  }
-
   void _handleForegroundMessage(RemoteMessage message) {
     print('Received foreground notification: ${message.notification?.title}');
 
-    // Show local notification when app is in foreground
+    // Process and show dialog (no local notification)
     if (message.notification != null) {
-      _showLocalNotification(
-        title: message.notification!.title ?? 'Attendanzy',
-        body: message.notification!.body ?? '',
-        payload: json.encode(message.data),
-      );
-
-      // Process notification and show dialog
       NotificationHandler.handleNotification(message);
     }
   }
@@ -160,41 +104,6 @@ class FirebaseApi {
     print('Notification tapped: ${message.data}');
     // Process notification when user taps on it
     NotificationHandler.handleNotification(message);
-  }
-
-  Future<void> _showLocalNotification({
-    required String title,
-    required String body,
-    String? payload,
-  }) async {
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-          'attendanzy_notifications',
-          'Attendanzy Notifications',
-          channelDescription: 'Notifications for leave and OD request updates',
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-        );
-
-    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-
-    const NotificationDetails notificationDetails = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
-    await _localNotifications.show(
-      DateTime.now().millisecondsSinceEpoch.remainder(100000),
-      title,
-      body,
-      notificationDetails,
-      payload: payload,
-    );
   }
 
   Future<void> _sendTokenToBackend(String token) async {

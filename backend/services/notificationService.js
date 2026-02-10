@@ -271,7 +271,7 @@ const notifyStudentOnStatusChange = async (request, requestType, newStatus, appr
     }
 
     const data = {
-        type: 'status_update',
+        type: approverRole === 'hod' ? 'hod_decision' : 'status_update',
         requestType: requestType,
         requestId: request._id?.toString() || '',
         status: newStatus,
