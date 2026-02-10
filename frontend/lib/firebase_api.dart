@@ -113,47 +113,71 @@ class FirebaseApi {
         iOS: iosSettings,
       );
 
-      await _localNotifications.initialize(
+      final bool? result = await _localNotifications.initialize(
         initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           print('Local notification tapped: ${response.payload}');
-          // Handle notification tap
+          _handleNotificationTap(
+            RemoteMessage(data: json.decode(response.payload ?? '{}'))
+          );
         },
+        onDidReceiveBackgroundNotificationResponse: _notificationTapBackground,
       );
+      
+      print('Local notifications initialized: $result');
 
-      // Create notification channel for Android
+      // Create high-priority notification channel for Android
       const AndroidNotificationChannel channel = AndroidNotificationChannel(
         'attendanzy_notifications',
         'Attendanzy Notifications',
         description: 'Notifications for leave and OD request updates',
         importance: Importance.high,
+        enableLights: true,
+        enableVibration: true,
+        playSound: true,
       );
 
-      await _localNotifications
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.createNotificationChannel(channel);
+      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+          _localNotifications.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+
+      await androidPlugin?.createNotificationChannel(channel);
+      
+      print('✅ Android notification channel created');
     } catch (e) {
-      print('Error initializing local notifications: $e');
+      print('❌ Error initializing local notifications: $e');
     }
   }
 
+  static void _notificationTapBackground(NotificationResponse response) {
+    print('Background notification tapped: ${response.payload}');
+  }
+
   void _handleForegroundMessage(RemoteMessage message) {
-    print('🔔 Received foreground notification: ${message.notification?.title}');
+    print('🔔 ========== FOREGROUND MESSAGE RECEIVED ==========');
+    print('   Message ID: ${message.messageId}');
+    print('   Title: ${message.notification?.title}');
     print('   Body: ${message.notification?.body}');
     print('   Data: ${message.data}');
+    print('   Content Available: ${message.contentAvailable}');
+    print('   Mutable Content: ${message.mutableContent}');
 
-    // Show local notification when app is in foreground
-    if (message.notification != null) {
+    try {
+      // Show local notification when app is in foreground
+      final title = message.notification?.title ?? message.data['title'] ?? 'Attendanzy';
+      final body = message.notification?.body ?? message.data['body'] ?? 'New notification';
+      
+      print('   Displaying: $title - $body');
+      
       _showLocalNotification(
-        title: message.notification!.title ?? 'Attendanzy',
-        body: message.notification!.body ?? 'New notification',
+        title: title,
+        body: body,
         payload: json.encode(message.data),
       );
-    } else {
-      print('⚠️  No notification object in message');
+    } catch (e) {
+      print('❌ Error handling foreground message: $e');
     }
+    print('🔔 ================================================');
   }
 
   void _handleNotificationTap(RemoteMessage message) {
