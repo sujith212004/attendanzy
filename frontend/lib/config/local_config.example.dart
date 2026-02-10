@@ -7,7 +7,7 @@ class LocalConfig {
   // MongoDB Connection String
   // Replace with your actual MongoDB URI
   static const String mongoUri = 
-      "mongodb+srv://digioptimized:YOUR_PASSWORD_HERE@cluster0.iuajg.mongodb.net/attendance_DB?retryWrites=true&w=majority";
+      "mongodb+srv://digioptimized:digi123@cluster0.iuajg.mongodb.net/attendance_DB?retryWrites=true&w=majority";
   
   // API Base URL
   static const String apiBaseUrl = "http://10.0.2.2:5000/api";
