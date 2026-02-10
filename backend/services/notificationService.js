@@ -208,6 +208,11 @@ const notifyStaffOnNewRequest = async (request, requestType) => {
  */
 const notifyHODOnForward = async (request, requestType) => {
     try {
+        console.log(`\n========== HOD FORWARD NOTIFICATION START ==========`);
+        console.log(`Request Type: ${requestType}`);
+        console.log(`Department: ${request.department}`);
+        console.log(`Request ID: ${request._id}`);
+
         const studentName = request.studentName || request.name || 'A student';
         const title = `${requestType} Request - Awaiting Approval`;
         const body = `A ${requestType.toLowerCase()} request from ${studentName} (${request.year}, ${request.section}) has been forwarded by Staff and requires your approval.`;
@@ -218,20 +223,46 @@ const notifyHODOnForward = async (request, requestType) => {
             studentEmail: request.studentEmail || ''
         };
 
+        console.log(`Searching for HOD in department: ${request.department}`);
+
         // Find HOD for this department in HOD collection
         const hod = await HOD.findOne({
             department: request.department
         });
 
-        if (hod && hod.email) {
-            console.log(`Notifying HOD ${hod.email} about forwarded ${requestType} request`);
-            return await sendNotificationToUser(hod.email, title, body, data);
+        if (!hod) {
+            console.error(`❌ No HOD found for department: ${request.department}`);
+            console.log(`========== HOD FORWARD NOTIFICATION END ==========\n`);
+            return { success: false, message: 'No HOD found for department' };
         }
 
-        console.log(`No HOD found for department: ${request.department}`);
-        return { success: false, message: 'No HOD found for department' };
+        console.log(`Found HOD: ${hod.name || hod.Name} (${hod.email || hod['College Email']})`);
+
+        if (!hod.email && !hod['College Email']) {
+            console.error(`❌ HOD found but has no email address`);
+            console.log(`========== HOD FORWARD NOTIFICATION END ==========\n`);
+            return { success: false, message: 'HOD has no email' };
+        }
+
+        const hodEmail = hod.email || hod['College Email'];
+        console.log(`Sending notification to HOD: ${hodEmail}`);
+        console.log(`Notification Title: ${title}`);
+        console.log(`Notification Body: ${body}`);
+
+        const result = await sendNotificationToUser(hodEmail, title, body, data);
+
+        if (result.success) {
+            console.log(`✅ HOD NOTIFICATION SUCCESS`);
+            console.log(`Message ID: ${result.messageId}`);
+        } else {
+            console.error(`❌ HOD NOTIFICATION FAILED: ${result.message || result.error}`);
+        }
+
+        console.log(`========== HOD FORWARD NOTIFICATION END ==========\n`);
+        return result;
     } catch (error) {
-        console.error('Error in notifyHODOnForward:', error);
+        console.error(`❌ Error in notifyHODOnForward:`, error);
+        console.log(`========== HOD FORWARD NOTIFICATION END ==========\n`);
         return { success: false, error: error.message };
     }
 };

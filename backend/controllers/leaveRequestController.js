@@ -237,6 +237,8 @@ exports.updateStaffStatus = async (req, res) => {
             if (section) leaveRequest.section = section;
 
             leaveRequest.hodStatus = 'pending';
+            // IMPORTANT: Status remains 'pending' overall until HOD approves
+            leaveRequest.status = 'pending';
 
             // Notify HOD about forwarded request
             try {

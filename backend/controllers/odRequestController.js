@@ -223,7 +223,8 @@ exports.updateStaffStatus = async (req, res) => {
 
             // Set HOD status to pending so it shows up for HOD
             odRequest.hodStatus = 'pending';
-            // Status remains 'pending' overall until HOD approves (becomes 'accepted')
+            // IMPORTANT: Status remains 'pending' overall until HOD approves
+            odRequest.status = 'pending';
 
             // Notify HOD about forwarded request
             try {
