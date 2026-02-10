@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config/api_config.dart';
+import 'notification_handler.dart';
 
 // Handle background messages
 @pragma('vm:entry-point')
@@ -149,13 +150,16 @@ class FirebaseApi {
         body: message.notification!.body ?? '',
         payload: json.encode(message.data),
       );
+
+      // Process notification and show dialog
+      NotificationHandler.handleNotification(message);
     }
   }
 
   void _handleNotificationTap(RemoteMessage message) {
     print('Notification tapped: ${message.data}');
-    // Navigate to appropriate screen based on notification data
-    // You can use a navigation service or callback here
+    // Process notification when user taps on it
+    NotificationHandler.handleNotification(message);
   }
 
   Future<void> _showLocalNotification({
@@ -223,20 +227,20 @@ class FirebaseApi {
   Future<void> updateTokenForUser(String email) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // ALWAYS get fresh token from Firebase (don't use cached)
       // This ensures the correct device token is used
       print('Fetching fresh FCM token from Firebase for device...');
       String? token = await _firebaseMessaging.getToken();
-      
+
       if (token != null && token.isNotEmpty) {
         // Save to prefs
         await prefs.setString('fcm_token', token);
-        
+
         print('Updating FCM token for: $email');
         print('Token (first 50 chars): ${token.substring(0, 50)}...');
         print('API URL: $_apiBaseUrl/notifications/update-token');
-        
+
         final response = await http.post(
           Uri.parse('$_apiBaseUrl/notifications/update-token'),
           headers: {'Content-Type': 'application/json'},
@@ -244,7 +248,7 @@ class FirebaseApi {
         );
 
         print('FCM update response: ${response.statusCode} - ${response.body}');
-        
+
         if (response.statusCode == 200) {
           print('✅ FCM token updated successfully for: $email');
         } else {

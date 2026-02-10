@@ -275,4 +275,86 @@ class ApiService {
       return {'success': false, 'message': 'Failed to connect to server: $e'};
     }
   }
+
+  /// Get HOD OD requests
+  static Future<Map<String, dynamic>> getHODODRequests({
+    required String department,
+  }) async {
+    try {
+      final uri = Uri.parse(
+        '$baseUrl/od-requests/hod',
+      ).replace(queryParameters: {'department': department});
+
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      final data = jsonDecode(response.body);
+      return data;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to connect to server: $e'};
+    }
+  }
+
+  /// Update OD Request Status (HOD)
+  static Future<Map<String, dynamic>> updateHODODRequestStatus({
+    required String id,
+    required String status,
+    String? remarks,
+  }) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/od-requests/$id/hod-status'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'status': status, 'remarks': remarks}),
+      );
+
+      final data = jsonDecode(response.body);
+      return data;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to connect to server: $e'};
+    }
+  }
+
+  /// Get HOD Leave requests
+  static Future<Map<String, dynamic>> getHODLeaveRequests({
+    required String department,
+  }) async {
+    try {
+      final uri = Uri.parse(
+        '$baseUrl/leave-requests/hod',
+      ).replace(queryParameters: {'department': department});
+
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      final data = jsonDecode(response.body);
+      return data;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to connect to server: $e'};
+    }
+  }
+
+  /// Update Leave Request Status (HOD)
+  static Future<Map<String, dynamic>> updateHODLeaveRequestStatus({
+    required String id,
+    required String status,
+    String? remarks,
+  }) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/leave-requests/$id/hod-status'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'status': status, 'remarks': remarks}),
+      );
+
+      final data = jsonDecode(response.body);
+      return data;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to connect to server: $e'};
+    }
+  }
 }

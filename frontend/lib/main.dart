@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'features/attendance/presentation/pages/attendancedetails.dart';
 import 'core/services/firebase_api.dart';
+import 'core/services/notification_handler.dart';
 import 'core/config/firebase_options.dart';
 import 'features/academics/presentation/pages/gpa_calculator.dart';
 import 'features/home/presentation/pages/homepage.dart';
@@ -83,6 +84,8 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    // Set navigator key for notification handler
+    NotificationHandler.navigatorKey = navigatorKey;
     initialization();
     _userDataFuture = _loadUserData();
     _checkForUpdate();
@@ -220,7 +223,8 @@ class _MyAppState extends State<MyApp> {
                     ? FutureBuilder<Map<String, dynamic>?>(
                       future: _userDataFuture,
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
                           return const Scaffold(
                             body: Center(child: CircularProgressIndicator()),
                           );
@@ -289,6 +293,10 @@ class _MyAppState extends State<MyApp> {
           '/ ': (context) => const GPACalculatorPage(),
           '/timetablepage': (context) => TimetablePage(),
           '/odrequestpage': (context) => const ODRequestPage(),
+          // Notification handler routes
+          '/staff-requests': (context) => const ODRequestPage(),
+          '/hod-requests': (context) => const ODRequestPage(),
+          '/request-status': (context) => const ODRequestPage(),
         },
       ),
     );
