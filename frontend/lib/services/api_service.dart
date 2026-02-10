@@ -131,15 +131,35 @@ class ApiService {
   /// Get student's OD requests
   static Future<Map<String, dynamic>> getStudentODRequests(String email) async {
     try {
+      print('📡 Fetching OD requests from: $baseUrl/od-requests/student/$email');
       final response = await http.get(
         Uri.parse('$baseUrl/od-requests/student/$email'),
         headers: {'Content-Type': 'application/json'},
-      );
+      ).timeout(const Duration(seconds: 10));
 
-      final data = jsonDecode(response.body);
-      return data;
+      print('📨 Response status: ${response.statusCode}');
+      print('📨 Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('✅ OD requests parsed successfully: ${data.toString()}');
+        return data;
+      } else {
+        final data = jsonDecode(response.body);
+        print('❌ API error: ${response.statusCode} - ${data.toString()}');
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Failed to fetch OD requests (${response.statusCode})',
+          'requests': []
+        };
+      }
     } catch (e) {
-      return {'success': false, 'message': 'Failed to connect to server: $e'};
+      print('❌ Exception fetching OD requests: $e');
+      return {
+        'success': false,
+        'message': 'Failed to connect to server: $e',
+        'requests': []
+      };
     }
   }
 
@@ -148,15 +168,35 @@ class ApiService {
     String email,
   ) async {
     try {
+      print('📡 Fetching leave requests from: $baseUrl/leave-requests/student/$email');
       final response = await http.get(
         Uri.parse('$baseUrl/leave-requests/student/$email'),
         headers: {'Content-Type': 'application/json'},
-      );
+      ).timeout(const Duration(seconds: 10));
 
-      final data = jsonDecode(response.body);
-      return data;
+      print('📨 Response status: ${response.statusCode}');
+      print('📨 Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('✅ Leave requests parsed successfully: ${data.toString()}');
+        return data;
+      } else {
+        final data = jsonDecode(response.body);
+        print('❌ API error: ${response.statusCode} - ${data.toString()}');
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Failed to fetch leave requests (${response.statusCode})',
+          'requests': []
+        };
+      }
     } catch (e) {
-      return {'success': false, 'message': 'Failed to connect to server: $e'};
+      print('❌ Exception fetching leave requests: $e');
+      return {
+        'success': false,
+        'message': 'Failed to connect to server: $e',
+        'requests': []
+      };
     }
   }
 
