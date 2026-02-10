@@ -264,7 +264,14 @@ exports.updateHODStatus = async (req, res) => {
         const { id } = req.params;
         const { status, remarks } = req.body;
 
+        console.log(`\n========== HOD STATUS UPDATE START ==========`);
+        console.log(`Request ID: ${id}`);
+        console.log(`New Status: ${status}`);
+        console.log(`Remarks: ${remarks || 'None'}`);
+
         if (!status || !['approved', 'rejected'].includes(status)) {
+            console.error(`❌ Invalid status provided: ${status}`);
+            console.log(`========== HOD STATUS UPDATE END ==========\n`);
             return res.status(400).json({
                 success: false,
                 message: 'Invalid status. Must be "approved" or "rejected"',
@@ -274,13 +281,21 @@ exports.updateHODStatus = async (req, res) => {
         const odRequest = await ODRequest.findById(id);
 
         if (!odRequest) {
+            console.error(`❌ OD request not found: ${id}`);
+            console.log(`========== HOD STATUS UPDATE END ==========\n`);
             return res.status(404).json({
                 success: false,
                 message: 'OD request not found',
             });
         }
 
+        console.log(`Found OD Request for student: ${odRequest.studentEmail}`);
+        console.log(`Current staffStatus: ${odRequest.staffStatus}`);
+        console.log(`Current hodStatus: ${odRequest.hodStatus}`);
+
         if (odRequest.staffStatus !== 'approved') {
+            console.error(`❌ Request not approved by staff yet`);
+            console.log(`========== HOD STATUS UPDATE END ==========\n`);
             return res.status(400).json({
                 success: false,
                 message: 'OD request must be approved by staff first',
@@ -293,27 +308,29 @@ exports.updateHODStatus = async (req, res) => {
         // Update overall status
         if (status === 'approved') {
             odRequest.status = 'accepted';
+            console.log(`✅ Setting overall status to 'accepted'`);
         } else {
             odRequest.status = 'rejected';
+            console.log(`❌ Setting overall status to 'rejected'`);
         }
 
         await odRequest.save();
+        console.log(`✅ OD request updated in database`);
 
         // Notify student about HOD decision
+        console.log(`\nAttempting to notify student about HOD decision...`);
         try {
-            await notifyStudentOnStatusChange(odRequest, 'OD', status, 'hod');
+            const notificationResult = await notifyStudentOnStatusChange(odRequest, 'OD', status, 'hod');
+            if (notificationResult.success) {
+                console.log(`✅ Student notification sent successfully`);
+            } else {
+                console.error(`❌ Student notification failed: ${notificationResult.message || notificationResult.error}`);
+            }
         } catch (notifError) {
-            console.error('Student HOD notification error:', notifError);
+            console.error('❌ Student HOD notification error:', notifError);
         }
 
-        // Notify staff about HOD decision - DISABLED as per new requirement (Student only)
-        /*
-        try {
-            await notifyStaffOnHODDecision(odRequest, 'OD', status);
-        } catch (notifError) {
-            console.error('Staff HOD notification error:', notifError);
-        }
-        */
+        console.log(`========== HOD STATUS UPDATE END ==========\n`);
 
         res.status(200).json({
             success: true,
@@ -322,7 +339,8 @@ exports.updateHODStatus = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Update HOD status error:', error);
+        console.error('❌ Update HOD status error:', error);
+        console.log(`========== HOD STATUS UPDATE END ==========\n`);
         res.status(500).json({
             success: false,
             message: 'Failed to update status',

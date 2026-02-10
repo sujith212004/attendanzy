@@ -277,7 +277,14 @@ exports.updateHODStatus = async (req, res) => {
         const { id } = req.params;
         const { status, remarks } = req.body;
 
+        console.log(`\n========== HOD STATUS UPDATE (LEAVE) START ==========`);
+        console.log(`Request ID: ${id}`);
+        console.log(`New Status: ${status}`);
+        console.log(`Remarks: ${remarks || 'None'}`);
+
         if (!status || !['approved', 'rejected'].includes(status)) {
+            console.error(`❌ Invalid status provided: ${status}`);
+            console.log(`========== HOD STATUS UPDATE (LEAVE) END ==========\n`);
             return res.status(400).json({
                 success: false,
                 message: 'Invalid status. Must be "approved" or "rejected"',
@@ -287,13 +294,21 @@ exports.updateHODStatus = async (req, res) => {
         const leaveRequest = await LeaveRequest.findById(id);
 
         if (!leaveRequest) {
+            console.error(`❌ Leave request not found: ${id}`);
+            console.log(`========== HOD STATUS UPDATE (LEAVE) END ==========\n`);
             return res.status(404).json({
                 success: false,
                 message: 'Leave request not found',
             });
         }
 
+        console.log(`Found Leave Request for student: ${leaveRequest.studentEmail}`);
+        console.log(`Current staffStatus: ${leaveRequest.staffStatus}`);
+        console.log(`Current hodStatus: ${leaveRequest.hodStatus}`);
+
         if (leaveRequest.staffStatus !== 'approved') {
+            console.error(`❌ Request not approved by staff yet`);
+            console.log(`========== HOD STATUS UPDATE (LEAVE) END ==========\n`);
             return res.status(400).json({
                 success: false,
                 message: 'Leave request must be approved by staff first',
@@ -306,27 +321,29 @@ exports.updateHODStatus = async (req, res) => {
         // Update overall status
         if (status === 'approved') {
             leaveRequest.status = 'accepted';
+            console.log(`✅ Setting overall status to 'accepted'`);
         } else {
             leaveRequest.status = 'rejected';
+            console.log(`❌ Setting overall status to 'rejected'`);
         }
 
         await leaveRequest.save();
+        console.log(`✅ Leave request updated in database`);
 
         // Notify student about HOD decision
+        console.log(`\nAttempting to notify student about HOD decision...`);
         try {
-            await notifyStudentOnStatusChange(leaveRequest, 'Leave', status, 'hod');
+            const notificationResult = await notifyStudentOnStatusChange(leaveRequest, 'Leave', status, 'hod');
+            if (notificationResult.success) {
+                console.log(`✅ Student notification sent successfully`);
+            } else {
+                console.error(`❌ Student notification failed: ${notificationResult.message || notificationResult.error}`);
+            }
         } catch (notifError) {
-            console.error('Student HOD notification error:', notifError);
+            console.error('❌ Student HOD notification error:', notifError);
         }
 
-        // Notify staff about HOD decision - DISABLED as per new requirement (Student only)
-        /*
-        try {
-            await notifyStaffOnHODDecision(leaveRequest, 'Leave', status);
-        } catch (notifError) {
-            console.error('Staff HOD notification error:', notifError);
-        }
-        */
+        console.log(`========== HOD STATUS UPDATE (LEAVE) END ==========\n`);
 
         res.status(200).json({
             success: true,
@@ -335,7 +352,8 @@ exports.updateHODStatus = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Update HOD status error:', error);
+        console.error('❌ Update HOD status error:', error);
+        console.log(`========== HOD STATUS UPDATE (LEAVE) END ==========\n`);
         res.status(500).json({
             success: false,
             message: 'Failed to update status',

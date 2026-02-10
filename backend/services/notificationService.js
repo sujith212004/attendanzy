@@ -240,51 +240,82 @@ const notifyHODOnForward = async (request, requestType) => {
  * Send notification to student when request is approved/rejected
  */
 const notifyStudentOnStatusChange = async (request, requestType, newStatus, approverRole) => {
-    const statusText = newStatus.toLowerCase();
-    const studentName = request.studentName || request.name || 'Student';
+    try {
+        console.log(`\n========== STUDENT NOTIFICATION START ==========`);
+        console.log(`Request Type: ${requestType}`);
+        console.log(`New Status: ${newStatus}`);
+        console.log(`Approver Role: ${approverRole}`);
+        console.log(`Request ID: ${request._id}`);
 
-    let title, body;
+        const statusText = newStatus.toLowerCase();
+        const studentName = request.studentName || request.name || 'Student';
+        const studentEmail = request.studentEmail || request.email;
 
-    if (approverRole === 'hod') {
-        if (statusText === 'approved' || statusText === 'accepted') {
-            title = `${requestType} Request Accepted`;
-            body = `Hi ${studentName}, your ${requestType.toLowerCase()} request has been accepted by HOD. You're good to go!`;
-        } else if (statusText === 'rejected') {
-            title = `${requestType} Request Rejected`;
-            body = `Hi ${studentName}, your ${requestType.toLowerCase()} request has been rejected by HOD. Please contact your department for more details.`;
-        } else {
-            title = `${requestType} Request Update`;
-            body = `Hi ${studentName}, your ${requestType.toLowerCase()} request status has been updated by HOD.`;
+        if (!studentEmail) {
+            console.error(`❌ NOTIFICATION FAILED: No student email found for request ${request._id}`);
+            console.log(`========== STUDENT NOTIFICATION END ==========\n`);
+            return { success: false, message: 'No student email found' };
         }
-    } else {
-        // Staff actions
-        if (statusText === 'approved' || statusText === 'accepted' || statusText === 'forwarded') {
-            title = `${requestType} Request Forwarded`;
-            body = `Hi ${studentName}, your ${requestType.toLowerCase()} request has been forwarded to HOD for final approval.`;
-        } else if (statusText === 'rejected') {
-            title = `${requestType} Request Rejected`;
-            body = `Hi ${studentName}, your ${requestType.toLowerCase()} request has been rejected by Staff. Please contact your class incharge for details.`;
+
+        console.log(`Student Email: ${studentEmail}`);
+        console.log(`Student Name: ${studentName}`);
+
+        let title, body;
+
+        if (approverRole === 'hod') {
+            if (statusText === 'approved' || statusText === 'accepted') {
+                title = `${requestType} Request Accepted`;
+                body = `Hi ${studentName}, your ${requestType.toLowerCase()} request has been accepted by HOD. You're good to go!`;
+            } else if (statusText === 'rejected') {
+                title = `${requestType} Request Rejected`;
+                body = `Hi ${studentName}, your ${requestType.toLowerCase()} request has been rejected by HOD. Please contact your department for more details.`;
+            } else {
+                title = `${requestType} Request Update`;
+                body = `Hi ${studentName}, your ${requestType.toLowerCase()} request status has been updated by HOD.`;
+            }
         } else {
-            title = `${requestType} Request Update`;
-            body = `Hi ${studentName}, your ${requestType.toLowerCase()} request status has been updated by Staff.`;
+            // Staff actions
+            if (statusText === 'approved' || statusText === 'accepted' || statusText === 'forwarded') {
+                title = `${requestType} Request Forwarded`;
+                body = `Hi ${studentName}, your ${requestType.toLowerCase()} request has been forwarded to HOD for final approval.`;
+            } else if (statusText === 'rejected') {
+                title = `${requestType} Request Rejected`;
+                body = `Hi ${studentName}, your ${requestType.toLowerCase()} request has been rejected by Staff. Please contact your class incharge for details.`;
+            } else {
+                title = `${requestType} Request Update`;
+                body = `Hi ${studentName}, your ${requestType.toLowerCase()} request status has been updated by Staff.`;
+            }
         }
-    }
 
-    const data = {
-        type: approverRole === 'hod' ? 'hod_decision' : 'status_update',
-        requestType: requestType,
-        requestId: request._id?.toString() || '',
-        status: newStatus,
-        approverRole: approverRole
-    };
+        console.log(`Notification Title: ${title}`);
+        console.log(`Notification Body: ${body}`);
 
-    const studentEmail = request.studentEmail || request.email;
-    if (studentEmail) {
-        console.log(`Notifying student ${studentEmail}: ${title} - ${body}`);
-        return await sendNotificationToUser(studentEmail, title, body, data);
+        const data = {
+            type: approverRole === 'hod' ? 'hod_decision' : 'status_update',
+            requestType: requestType,
+            requestId: request._id?.toString() || '',
+            status: newStatus,
+            approverRole: approverRole
+        };
+
+        console.log(`Sending notification to student...`);
+        const result = await sendNotificationToUser(studentEmail, title, body, data);
+
+        if (result.success) {
+            console.log(`✅ NOTIFICATION SUCCESS: Student notified successfully`);
+            console.log(`Message ID: ${result.messageId}`);
+        } else {
+            console.error(`❌ NOTIFICATION FAILED: ${result.message || result.error}`);
+        }
+
+        console.log(`========== STUDENT NOTIFICATION END ==========\n`);
+        return result;
+    } catch (error) {
+        console.error(`❌ NOTIFICATION ERROR: ${error.message}`);
+        console.error(error);
+        console.log(`========== STUDENT NOTIFICATION END ==========\n`);
+        return { success: false, error: error.message };
     }
-    console.warn(`No student email found for request ${request._id}`);
-    return { success: false, message: 'No student email found' };
 };
 
 /**
