@@ -24,31 +24,31 @@ connectDB();
 if (security && process.env.NODE_ENV === 'production') {
     // Helmet for security headers
     app.use(security.helmet());
-    
+
     // Rate limiting
     app.use(security.rateLimiter());
-    
+
     // CORS with whitelist
     app.use(security.cors());
-    
+
     // Prevent NoSQL injection
     app.use(security.mongoSanitize());
-    
+
     // Prevent XSS attacks
     app.use(security.xss());
-    
+
     // Prevent HTTP Parameter Pollution
     app.use(security.hpp());
-    
+
     // Security headers
     app.use(security.securityHeaders);
-    
+
     // Input validation
     app.use(security.validateInput);
-    
+
     // Audit logging
     app.use(security.auditLog);
-    
+
     console.log('🔒 Production security middleware enabled');
 } else {
     // Development CORS - allow all origins
@@ -70,6 +70,25 @@ if (process.env.NODE_ENV === 'development') {
 } else {
     app.use(morgan('combined'));
 }
+
+// Global Request Logger for Debugging
+app.use((req, res, next) => {
+    // Skip logging for health check to avoid clutter
+    if (req.path === '/api/health') return next();
+
+    console.log(`\n[DEBUG] ${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+    if (req.method === 'POST' || req.method === 'PUT') {
+        if (req.body && Object.keys(req.body).length > 0) {
+            // Log body but sanitize sensitive fields if needed
+            const logBody = { ...req.body };
+            if (logBody.password) logBody.password = '***';
+            console.log(`[DEBUG] Body:`, JSON.stringify(logBody).substring(0, 1000)); // Limit log size
+        } else {
+            console.log(`[DEBUG] Body: <empty>`);
+        }
+    }
+    next();
+});
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -95,7 +114,7 @@ app.get('/api/db-status', (req, res) => {
         2: 'connecting',
         3: 'disconnecting'
     };
-    
+
     res.status(200).json({
         success: true,
         database: {
@@ -173,6 +192,27 @@ app.listen(PORT, () => {
     console.log('═══════════════════════════════════════════════════════');
     console.log('');
 });
+
+// Keep-Alive Mechanism for Render (Free Tier)
+// Pings the server every 14 minutes to prevent sleeping
+if (process.env.NODE_ENV === 'production') {
+    const https = require('https');
+    const interval = 14 * 60 * 1000; // 14 minutes
+
+    setInterval(() => {
+        const url = process.env.RENDER_EXTERNAL_URL || `https://${process.env.RENDER_SERVICE_NAME}.onrender.com`;
+
+        if (url && url.startsWith('http')) {
+            https.get(`${url}/api/health`, (resp) => {
+                console.log(`⏰ Keep-Alive Ping Sent to ${url}: ${resp.statusCode}`);
+            }).on('error', (err) => {
+                console.error('⏰ Keep-Alive Ping Error:', err.message);
+            });
+        }
+    }, interval);
+
+    console.log(`⏰ Keep-Alive mechanism enabled (14m interval)`);
+}
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
