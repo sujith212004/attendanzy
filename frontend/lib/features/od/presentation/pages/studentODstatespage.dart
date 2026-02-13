@@ -464,20 +464,29 @@ class _StudentODStatusPageState extends State<StudentODStatusPage>
   }
 
   String _formatTimestamp(String? timestamp, {String? fallback}) {
-    // Try timestamp, then fallback (createdAt), else unknown
+    // Try timestamp first
     String? value =
-        (timestamp != null && timestamp.isNotEmpty) ? timestamp : null;
-    if ((value == null || value.isEmpty) &&
+        (timestamp != null && timestamp.isNotEmpty && timestamp != 'null')
+            ? timestamp
+            : null;
+
+    // If timestamp invalid, try fallback
+    if (value == null &&
         fallback != null &&
-        fallback.isNotEmpty)
+        fallback.isNotEmpty &&
+        fallback != 'null') {
       value = fallback;
+    }
+
     if (value == null || value.isEmpty) return 'Unknown date';
+
     try {
       final date = DateTime.parse(value);
       final now = DateTime.now();
       final difference = now.difference(date);
+
       if (difference.inDays > 7) {
-        return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+        return '${date.day}/${date.month}/${date.year}';
       } else if (difference.inDays > 0) {
         return '${difference.inDays}d ago';
       } else if (difference.inHours > 0) {
@@ -683,44 +692,72 @@ class _StudentODStatusPageState extends State<StudentODStatusPage>
     );
   }
 
-  Widget _buildRequestCard(Map<String, dynamic> request, int index) {
-    // Show message if staff approved and hod pending
+  Widget _buildRequestCard(Map<String, dynamic> req, int index) {
+    // Determine the correct status
+    String status;
+    final String staffStatusRaw =
+        (req['staffStatus'] ?? 'pending').toString().toLowerCase();
+    final String mainStatus = (req['status'] ?? '').toString().toLowerCase();
+    final String rejectionReason =
+        (req['rejectionReason'] ?? '').toString().trim();
+
+    if (rejectionReason.isNotEmpty || mainStatus == 'rejected') {
+      status = 'rejected';
+    } else if (staffStatusRaw == 'accepted' ||
+        staffStatusRaw == 'approved' ||
+        mainStatus == 'accepted') {
+      status = 'accepted';
+    } else {
+      status = staffStatusRaw.isEmpty ? 'pending' : staffStatusRaw;
+    }
+
+    final String subject = req['subject'] ?? 'OD Request';
+    final String fromDate = req['from'] ?? 'N/A';
+    final String toDate = req['to'] ?? 'N/A';
+    final String content = req['content'] ?? req['reason'] ?? '';
+    final bool isPending = status == 'pending';
+
+    // Status display logic
     final bool staffApproved =
-        (request['staffStatus']?.toString().toLowerCase() == 'accepted' ||
-            request['staffStatus']?.toString().toLowerCase() == 'approved');
+        (req['staffStatus']?.toString().toLowerCase() == 'accepted' ||
+            req['staffStatus']?.toString().toLowerCase() == 'approved');
     final bool hodPending =
-        (request['hodStatus']?.toString().toLowerCase() == 'pending' ||
-            request['hodStatus'] == null);
-    // Check if request is already fully approved/accepted
-    final String rawStatus = (request['status'] ?? '').toString().toLowerCase();
+        (req['hodStatus']?.toString().toLowerCase() == 'pending' ||
+            req['hodStatus'] == null);
     final String hodStatusVal =
-        (request['hodStatus'] ?? '').toString().toLowerCase();
+        (req['hodStatus'] ?? '').toString().toLowerCase();
     final bool isAccepted =
-        rawStatus == 'accepted' ||
-        rawStatus == 'approved' ||
+        mainStatus == 'accepted' ||
+        mainStatus == 'approved' ||
         hodStatusVal == 'accepted' ||
         hodStatusVal == 'approved';
-    // If status is missing but staffStatus is Rejected, treat as rejected
-    String status = rawStatus;
-    if (status.isEmpty &&
-        (request['staffStatus']?.toString().toLowerCase() == 'rejected')) {
-      status = 'rejected';
-    }
-    if (status.isEmpty) status = 'pending';
-    final statusColor = _getStatusColor(status);
-    final timestamp = request['timestamp']?.toString() ?? '';
-    final formattedDate = _formatTimestamp(timestamp);
+
+    final Color statusColor = _getStatusColor(status);
+    final String timestamp = req['timestamp']?.toString() ?? '';
+    final String formattedDate = _formatTimestamp(
+      timestamp,
+      fallback: req['createdAt']?.toString(),
+    );
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: statusColor.withOpacity(0.2), width: 1.5),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color:
+              isPending
+                  ? statusColor.withOpacity(0.3)
+                  : const Color(0xFFE2E8F0),
+          width: isPending ? 1.5 : 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 15,
+            color:
+                isPending
+                    ? statusColor.withOpacity(0.1)
+                    : Colors.black.withOpacity(0.04),
+            blurRadius: isPending ? 12 : 8,
             offset: const Offset(0, 4),
           ),
         ],
@@ -728,302 +765,452 @@ class _StudentODStatusPageState extends State<StudentODStatusPage>
       child: Material(
         color: Colors.transparent,
         child: InkWell(
+          borderRadius: BorderRadius.circular(18),
           onTap: () {
             HapticFeedback.selectionClick();
-            _showODRequestDetails(request, status, statusColor, formattedDate);
+            _showODRequestDetails(req, status, statusColor, formattedDate);
           },
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header with status
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        request['subject'] ?? 'OD Request',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A202C),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [statusColor.withOpacity(0.08), Colors.transparent],
+                stops: const [0.0, 0.15],
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header Row with Icon
+                  Row(
+                    children: [
+                      // Icon Container
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [statusColor, statusColor.withOpacity(0.7)],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: statusColor.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                         ),
-                        overflow: TextOverflow.ellipsis,
+                        child: const Icon(
+                          Icons.assignment_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
                       ),
-                    ),
-                    // Three-dot menu with enhanced design
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: Colors.grey.shade200,
-                          width: 1,
-                        ),
-                      ),
-                      child: PopupMenuButton<String>(
-                        icon: Icon(
-                          Icons.more_vert_rounded,
-                          size: 18,
-                          color: Colors.grey.shade700,
-                        ),
-                        padding: const EdgeInsets.all(8),
-                        splashRadius: 20,
-                        offset: const Offset(0, 35),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 8,
-                        onSelected: (String value) {
-                          if (value == 'edit') {
-                            _editODRequest(request, index);
-                          } else if (value == 'delete') {
-                            _deleteODRequest(request, index);
-                          }
-                        },
-                        itemBuilder: (BuildContext context) {
-                          // Check if request is pending - only allow editing if pending
-                          final bool isPending =
-                              status.toLowerCase() == 'pending' ||
-                              status.toLowerCase() == 'pending_hod' ||
-                              status.isEmpty;
-
-                          List<PopupMenuEntry<String>> items = [];
-
-                          // Only show edit option if request is pending
-                          if (isPending) {
-                            items.add(
-                              PopupMenuItem<String>(
-                                value: 'edit',
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              subject,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                color: Color(0xFF1E293B),
+                                letterSpacing: 0.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            // Status Badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _getStatusIcon(status),
+                                    size: 12,
+                                    color: statusColor,
                                   ),
-                                  child: const Row(
-                                    children: [
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    status.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: statusColor,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Three-dot menu
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: PopupMenuButton<String>(
+                          icon: Icon(
+                            Icons.more_horiz_rounded,
+                            size: 18,
+                            color: Colors.grey.shade600,
+                          ),
+                          padding: EdgeInsets.zero,
+                          splashRadius: 20,
+                          offset: const Offset(0, 35),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 8,
+                          onSelected: (String value) {
+                            if (value == 'edit') {
+                              _editODRequest(req, index);
+                            } else if (value == 'delete') {
+                              _deleteODRequest(req, index);
+                            }
+                          },
+                          itemBuilder: (BuildContext context) {
+                            List<PopupMenuEntry<String>> items = [];
+                            if (isPending) {
+                              items.add(
+                                PopupMenuItem<String>(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: const [
                                       Icon(
                                         Icons.edit_rounded,
                                         size: 18,
                                         color: Color(0xFF3B82F6),
                                       ),
                                       SizedBox(width: 12),
-                                      Text(
-                                        'Edit Request',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
+                                      Text('Edit Request'),
                                     ],
                                   ),
                                 ),
-                              ),
-                            );
-                          }
-
-                          // Only show delete option if request is accepted or rejected
-                          if (!isPending) {
-                            items.add(
-                              PopupMenuItem<String>(
-                                value: 'delete',
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  child: const Row(
-                                    children: [
+                              );
+                            }
+                            if (!isPending) {
+                              items.add(
+                                PopupMenuItem<String>(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: const [
                                       Icon(
                                         Icons.delete_outline_rounded,
                                         size: 18,
                                         color: Color(0xFFEF4444),
                                       ),
                                       SizedBox(width: 12),
-                                      Text(
-                                        'Delete Request',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
+                                      Text('Delete Application'),
                                     ],
                                   ),
                                 ),
-                              ),
-                            );
-                          }
-
-                          return items;
-                        },
+                              );
+                            }
+                            return items;
+                          },
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    _buildStatusBadge(status, statusColor),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Staff approved, waiting for HOD message (only show if not already accepted)
-                if (staffApproved && hodPending && !isAccepted)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.verified_rounded,
-                          color: Color(0xFF10B981),
-                          size: 18,
-                        ),
-                        SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Approved by staff, waiting for HOD approval',
-                            style: TextStyle(
-                              color: Color(0xFF10B981),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
-                // Request details
-                _buildDetailRow(
-                  Icons.person_rounded,
-                  'From',
-                  request['from'] ?? '',
-                ),
-                const SizedBox(height: 8),
-                _buildDetailRow(
-                  Icons.business_rounded,
-                  'To',
-                  request['to'] ?? '',
-                ),
-                const SizedBox(height: 12),
 
-                // Show rejection reason if rejected
-                if (status == 'rejected' &&
-                    (request['rejectionReason']?.toString().isNotEmpty ??
-                        false)) ...[
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEE2E2),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFEF4444)),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(
-                          Icons.info_outline,
-                          color: Color(0xFFEF4444),
-                          size: 20,
-                        ),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Rejected by: ${request['rejectedBy']?.toString().toUpperCase() ?? 'Unknown'}\nReason: ${request['rejectionReason']}',
-                            style: const TextStyle(
-                              color: Color(0xFFEF4444),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  const SizedBox(height: 14),
 
-                // Footer with date and action
-                Row(
-                  children: [
-                    Icon(
-                      Icons.access_time_rounded,
-                      size: 16,
-                      color: Colors.grey.shade500,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _formatTimestamp(
-                        request['timestamp'] ?? request['createdAt'],
-                      ),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (status == 'accepted')
-                      Container(
+                  // Staff approved, waiting for HOD message
+                  if (staffApproved && hodPending && !isAccepted)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
-                          vertical: 6,
+                          vertical: 8,
                         ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF10B981).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: InkWell(
-                          onTap: () => _downloadODRequest(request),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.download_rounded,
-                                size: 14,
-                                color: Color(0xFF10B981),
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                'Download',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF10B981),
-                                ),
-                              ),
-                            ],
+                          border: Border.all(
+                            color: const Color(0xFF10B981).withOpacity(0.3),
                           ),
                         ),
-                      )
-                    else
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF3B82F6).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
+                        child: Row(
                           children: [
-                            Icon(
-                              Icons.visibility_rounded,
-                              size: 14,
-                              color: Color(0xFF3B82F6),
+                            const Icon(
+                              Icons.verified_rounded,
+                              color: Color(0xFF10B981),
+                              size: 16,
                             ),
-                            SizedBox(width: 4),
-                            Text(
-                              'View Details',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF3B82F6),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Approved by staff, waiting for HOD',
+                                style: TextStyle(
+                                  color: Color(0xFF10B981),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
+                    ),
+
+                  // Rejected Message
+                  if (req['staffStatus'] == 'rejected' ||
+                      status == 'rejected' &&
+                          (req['rejectionReason']?.toString().isNotEmpty ??
+                              false))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFFEF4444).withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.info_outline_rounded,
+                              color: Color(0xFFEF4444),
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Rejected by ${req['rejectedBy']?.toString().toUpperCase() ?? 'Staff'}',
+                                    style: const TextStyle(
+                                      color: Color(0xFFEF4444),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  if (req['rejectionReason'] != null)
+                                    Text(
+                                      req['rejectionReason'],
+                                      style: const TextStyle(
+                                        color: Color(0xFFEF4444),
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // Date Range Bar
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFE2E8F0),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // From
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'From',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                fromDate,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1E293B),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Arrow
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 16,
+                          color: Colors.grey.shade400,
+                        ),
+                        // To
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              const Text(
+                                'To',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                toDate,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1E293B),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Content Preview
+                  if (content.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      content,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF64748B),
+                        height: 1.4,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
-                ),
-              ],
+
+                  // Footer Actions
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time_rounded,
+                        size: 14,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        formattedDate,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const Spacer(),
+                      // Action Button
+                      if (status == 'accepted')
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () => _downloadODRequest(req),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: const [
+                                  Icon(
+                                    Icons.download_rounded,
+                                    size: 14,
+                                    color: Color(0xFF10B981),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Download',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF10B981),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                      else if (isPending)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3B82F6).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Reviewing',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF3B82F6),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1041,6 +1228,20 @@ class _StudentODStatusPageState extends State<StudentODStatusPage>
       );
     } catch (e) {
       _showSnackBar('Error downloading OD request: $e', Colors.red);
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+      case 'approved':
+        return Icons.check_circle_rounded;
+      case 'rejected':
+        return Icons.cancel_rounded;
+      case 'pending':
+      case 'pending_hod':
+      default:
+        return Icons.access_time_filled_rounded;
     }
   }
 

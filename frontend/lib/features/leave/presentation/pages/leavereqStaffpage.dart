@@ -581,39 +581,30 @@ class _LeaveRequestsStaffPageState extends State<LeaveRequestsStaffPage> {
                 request['studentName'].toString().trim().isNotEmpty)
             ? request['studentName']
             : 'Unknown';
-    final String studentEmail = request['studentEmail'] ?? 'No email';
-    final String studentClass = request['class'] ?? 'N/A';
-    final String studentYear = request['year'] ?? 'N/A';
-    final String leaveType = request['leaveType'] ?? 'N/A';
+    final String leaveType = request['leaveType'] ?? 'Leave Request';
     final String fromDate = _formatDate(request['fromDate']);
     final String toDate = _formatDate(request['toDate']);
-    final int duration =
-        (request['duration'] is int)
-            ? request['duration']
-            : int.tryParse(request['duration']?.toString() ?? '0') ?? 0;
+    final bool isPending = status == 'pending';
 
-    // Format submission time
-    String? createdAtStr = request['createdAt'];
-    String submissionTime = 'Unknown';
-    if (createdAtStr != null && createdAtStr.isNotEmpty) {
-      try {
-        final dt = DateTime.parse(createdAtStr);
-        submissionTime =
-            '${dt.day.toString().padLeft(2, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.year}  ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-      } catch (e) {
-        submissionTime = createdAtStr;
-      }
-    }
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color:
+              isPending
+                  ? _getStatusColor(status).withOpacity(0.3)
+                  : const Color(0xFFE2E8F0),
+          width: isPending ? 1.5 : 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 12,
+            color:
+                isPending
+                    ? _getStatusColor(status).withOpacity(0.1)
+                    : Colors.black.withOpacity(0.04),
+            blurRadius: isPending ? 12 : 8,
             offset: const Offset(0, 4),
           ),
         ],
@@ -621,7 +612,7 @@ class _LeaveRequestsStaffPageState extends State<LeaveRequestsStaffPage> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           onTap:
               () => showDialog(
                 context: context,
@@ -629,88 +620,120 @@ class _LeaveRequestsStaffPageState extends State<LeaveRequestsStaffPage> {
               ),
           child: Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              border: Border(
-                left: BorderSide(color: _getStatusColor(status), width: 4),
+              borderRadius: BorderRadius.circular(18),
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  _getStatusColor(status).withOpacity(0.08),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.15],
               ),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Submission Time Row
+                  // Header Row with Avatar
                   Row(
                     children: [
-                      Icon(
-                        Icons.access_time,
-                        size: 18,
-                        color: Color(0xFF64748B),
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Submitted: $submissionTime',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 10),
-                  // Header Row
-                  Row(
-                    children: [
+                      // Student Avatar
                       Container(
-                        width: 48,
-                        height: 48,
+                        width: 50,
+                        height: 50,
                         decoration: BoxDecoration(
-                          color: _getStatusColor(status).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _getStatusColor(status).withOpacity(0.2),
-                            width: 1,
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              _getStatusColor(status),
+                              _getStatusColor(status).withOpacity(0.7),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _getStatusColor(status).withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(
+                            studentName.isNotEmpty
+                                ? studentName[0].toUpperCase()
+                                : 'S',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                        child: Icon(
-                          _getStatusIcon(status),
-                          color: _getStatusColor(status),
-                          size: 24,
-                        ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '$leaveType Request - $studentName',
+                              studentName,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w700,
-                                fontSize: 18,
+                                fontSize: 15,
                                 color: Color(0xFF1E293B),
+                                letterSpacing: 0.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              leaveType,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                color: Color(0xFF64748B),
                               ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _getStatusBackgroundColor(status),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                status.toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: _getStatusColor(status),
-                                ),
+                          ],
+                        ),
+                      ),
+                      // Status Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(status).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _getStatusColor(status).withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _getStatusIcon(status),
+                              size: 14,
+                              color: _getStatusColor(status),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              status.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: _getStatusColor(status),
+                                letterSpacing: 0.5,
                               ),
                             ),
                           ],
@@ -719,90 +742,215 @@ class _LeaveRequestsStaffPageState extends State<LeaveRequestsStaffPage> {
                     ],
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
 
-                  // Student Details
-                  _buildDetailRow(
-                    Icons.person_outline,
-                    'Student Name',
-                    studentName,
+                  // Date Range Bar
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFE2E8F0),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF3B82F6,
+                                  ).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.login_rounded,
+                                  size: 16,
+                                  color: Color(0xFF3B82F6),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'From',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF94A3B8),
+                                      ),
+                                    ),
+                                    Text(
+                                      fromDate,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF1E293B),
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 18,
+                            color: const Color(0xFF94A3B8),
+                          ),
+                        ),
+                        Expanded(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    const Text(
+                                      'To',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF94A3B8),
+                                      ),
+                                    ),
+                                    Text(
+                                      toDate,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF1E293B),
+                                      ),
+                                      textAlign: TextAlign.end,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF8B5CF6,
+                                  ).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.logout_rounded,
+                                  size: 16,
+                                  color: Color(0xFF8B5CF6),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  _buildDetailRow(
-                    Icons.email_outlined,
-                    'Student Email',
-                    studentEmail,
-                  ),
-                  // const SizedBox(height: 12),
-                  // _buildDetailRow(Icons.class_outlined, 'Class', studentClass),
-                  const SizedBox(height: 12),
-                  _buildDetailRow(
-                    Icons.calendar_today_outlined,
-                    'Year',
-                    studentYear,
-                  ),
-                  const SizedBox(height: 20),
-                  // Request Details
-                  _buildDetailRow(
-                    Icons.calendar_today_outlined,
-                    'From Date',
-                    fromDate,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDetailRow(Icons.event_outlined, 'To Date', toDate),
-                  const SizedBox(height: 12),
-                  _buildDetailRow(
-                    Icons.timer_outlined,
-                    'Duration',
-                    '$duration day${duration != 1 ? 's' : ''}',
-                  ),
+
+                  // Reason Preview
+                  if (request['reason'] != null &&
+                      request['reason'].toString().isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: const Color(0xFFE2E8F0),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.notes_rounded,
+                            size: 16,
+                            color: const Color(0xFF64748B),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              request['reason'].toString(),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF475569),
+                                height: 1.4,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // Quick Action for Pending
+                  if (isPending) ...[
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.touch_app_rounded,
+                                  size: 16,
+                                  color: const Color(0xFF64748B),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Tap to Review',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildDetailRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: const Color(0xFF64748B).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, size: 18, color: const Color(0xFF64748B)),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 

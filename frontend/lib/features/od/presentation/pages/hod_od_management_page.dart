@@ -62,14 +62,22 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
       await db.open();
       final collection = db.collection(collectionName);
 
+      // Fetch requests forwarded by staff (staffStatus = 'approved')
       final query = mongo.where
           .eq('department', hodDepartment)
+          .eq('staffStatus', 'approved')
           .sortBy('createdAt', descending: true);
 
       if (kDebugMode) {
-        print("DEBUG: Executing MongoDB query for OD requests");
+        print(
+          "DEBUG: Executing MongoDB query for OD requests (department=$hodDepartment)",
+        );
       }
       final result = await collection.find(query).toList();
+
+      if (kDebugMode) {
+        print("DEBUG: Fetched ${result.length} requests");
+      }
 
       if (kDebugMode) {
         print("DEBUG: Found ${result.length} OD requests for this department.");
@@ -596,7 +604,23 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              (req['status'] ?? 'pending').toUpperCase(),
+                              () {
+                                if (req['staffStatus'] == 'rejected') {
+                                  return 'REJECTED BY STAFF';
+                                }
+                                if (req['staffStatus'] == 'pending') {
+                                  return status == 'rejected'
+                                      ? 'REJECTED'
+                                      : 'Pending';
+                                }
+                                if (req['staffStatus'] == 'approved' &&
+                                    (req['hodStatus'] == 'pending' ||
+                                        req['hodStatus'] == '' ||
+                                        req['hodStatus'] == null)) {
+                                  return 'Approved';
+                                }
+                                return status.toUpperCase();
+                              }(),
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
@@ -647,26 +671,30 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'From',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF94A3B8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'From',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF94A3B8),
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    fromDate,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF1E293B),
+                                    Text(
+                                      fromDate,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF1E293B),
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -683,26 +711,31 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  const Text(
-                                    'To',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF94A3B8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    const Text(
+                                      'To',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF94A3B8),
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    toDate,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF1E293B),
+                                    Text(
+                                      toDate,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF1E293B),
+                                      ),
+                                      textAlign: TextAlign.end,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                               const SizedBox(width: 10),
                               Container(
@@ -728,8 +761,16 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
                   ),
 
                   // Forwarded By Info
-                  if (req['forwardedBy'] != null &&
-                      req['forwardedBy'].toString().isNotEmpty) ...[
+                  // Use forwardedBy if available, otherwise fallback to staffName or forwardedByIncharge
+                  // Also show if staffStatus is approved OR hodStatus is pending (implying it reached HOD)
+                  if ((req['forwardedBy'] != null &&
+                          req['forwardedBy'].toString().isNotEmpty) ||
+                      (req['staffName'] != null &&
+                          req['staffName'].toString().isNotEmpty) ||
+                      (req['forwardedByIncharge'] != null &&
+                          req['forwardedByIncharge'].toString().isNotEmpty) ||
+                      req['staffStatus'] == 'approved' ||
+                      req['hodStatus'] == 'pending') ...[
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -752,12 +793,62 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
                             color: const Color(0xFF8B5CF6),
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            'Forwarded by ${req['forwardedBy']}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF8B5CF6),
+                          Expanded(
+                            child: Text(
+                              'Forwarded by ${req['forwardedBy'] ?? req['staffName'] ?? req['forwardedByIncharge'] ?? 'Staff'}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF8B5CF6),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // Rejected By Staff Info
+                  // Rejected By Staff Info
+                  if (status == 'rejected' &&
+                      req['staffStatus'] == 'rejected') ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.cancel_presentation_rounded,
+                            size: 16,
+                            color: const Color(0xFFEF4444),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              (req['rejectionReason'] != null &&
+                                      req['rejectionReason']
+                                          .toString()
+                                          .isNotEmpty)
+                                  ? 'Rejected: ${req['rejectionReason']}'
+                                  : 'Rejected by ${req['staffName'] ?? req['forwardedBy'] ?? 'Staff'}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFEF4444),
+                              ),
                             ),
                           ),
                         ],
@@ -972,23 +1063,28 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
                 : 'N/A',
           ),
           if (req['forwardedBy'] != null &&
-              req['forwardedBy'].toString().isNotEmpty) ...[
-            const SizedBox(height: 16),
-            _buildDialogDetailRow(
-              Icons.person_outline,
-              "Forwarded by",
-              req['forwardedBy'] ?? 'N/A',
+              req['forwardedBy'].toString().isNotEmpty)
+            Column(
+              children: [
+                const SizedBox(height: 16),
+                _buildDialogDetailRow(
+                  Icons.forward_outlined,
+                  "Forwarded By",
+                  req['forwardedBy'] ?? 'N/A',
+                ),
+                if (req['forwardedAt'] != null)
+                  Column(
+                    children: [
+                      const SizedBox(height: 16),
+                      _buildDialogDetailRow(
+                        Icons.schedule_outlined,
+                        "Forwarded At",
+                        _formatDateTime(req['forwardedAt']),
+                      ),
+                    ],
+                  ),
+              ],
             ),
-          ],
-          if (req['forwardedAt'] != null &&
-              req['forwardedAt'].toString().isNotEmpty) ...[
-            const SizedBox(height: 16),
-            _buildDialogDetailRow(
-              Icons.schedule_outlined,
-              "Forwarded at",
-              _formatDateTime(req['forwardedAt']),
-            ),
-          ],
 
           const SizedBox(height: 24),
           Container(

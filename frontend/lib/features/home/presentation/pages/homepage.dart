@@ -7,10 +7,10 @@ import '../../../issues/presentation/pages/Studentissuehodview.dart';
 import '../../../issues/presentation/pages/Studentissues.dart';
 import '../../../academics/presentation/pages/Timetabledepartment.dart';
 import '../../../auth/presentation/pages/changepassword.dart';
-import '../../../od/presentation/pages/odrequestadminpage.dart';
 import '../../../od/presentation/pages/odrequestpage.dart';
+import '../../../od/presentation/pages/hod_od_management_page.dart';
 import '../../../leave/presentation/pages/leave_request_page.dart';
-import '../../../leave/presentation/pages/leave_requests_admin_page.dart';
+import '../../../leave/presentation/pages/hod_leave_management_page.dart';
 import '../../../attendance/presentation/pages/absentees_page.dart';
 import 'request_status_page.dart';
 import 'profile_page.dart';
@@ -902,7 +902,7 @@ class _HomePageState extends State<HomePage> {
   void _navigateToHODODRequests() {
     Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => const ODRequestsAdminPage()));
+    ).push(MaterialPageRoute(builder: (_) => const HodOdManagementPage()));
   }
 
   void _navigateToStaffOdRequests() {
@@ -914,7 +914,7 @@ class _HomePageState extends State<HomePage> {
   void _navigateToHODLeaveRequests() {
     Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => const LeaveRequestsAdminPage()));
+    ).push(MaterialPageRoute(builder: (_) => const HodLeaveManagementPage()));
   }
 
   void _navigateToStaffLeaveRequests() {
