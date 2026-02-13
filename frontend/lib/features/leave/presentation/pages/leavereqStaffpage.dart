@@ -971,59 +971,79 @@ class _LeaveRequestsStaffPageState extends State<LeaveRequestsStaffPage> {
     // Use staffStatus to determine if buttons should be shown
     final staffStatus =
         (request['staffStatus'] ?? 'pending').toString().toLowerCase();
-    return Dialog.fullscreen(
-      child: Scaffold(
-        backgroundColor: const Color(0xFFFAFBFC),
-        appBar: AppBar(
-          title: const Text(
-            'Leave Request Details',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1F2937),
-            ),
-          ),
-          backgroundColor: Colors.white,
-          elevation: 0,
-          leading: IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close, color: Color(0xFF1F2937)),
-          ),
-          actions: [
-            Container(
-              margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: _getStatusBackgroundColor(staffStatus),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                staffStatus.toUpperCase(),
+
+    // We use a StatefulBuilder to manage the loading state locally within the dialog
+    bool isLoading = false;
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return Dialog.fullscreen(
+          child: Scaffold(
+            backgroundColor: const Color(0xFFFAFBFC),
+            appBar: AppBar(
+              title: const Text(
+                'Leave Request Details',
                 style: TextStyle(
-                  color: _getStatusColor(staffStatus),
+                  fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  fontSize: 11,
+                  color: Color(0xFF1F2937),
                 ),
               ),
-            ),
-          ],
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(1),
-            child: Container(height: 1, color: const Color(0xFFE5E7EB)),
-          ),
-        ),
-        body: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: _buildLeaveLetterContent(request),
+              backgroundColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close, color: Color(0xFF1F2937)),
+              ),
+              actions: [
+                Container(
+                  margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getStatusBackgroundColor(staffStatus),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    staffStatus.toUpperCase(),
+                    style: TextStyle(
+                      color: _getStatusColor(staffStatus),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Container(height: 1, color: const Color(0xFFE5E7EB)),
               ),
             ),
-            _buildLeaveActionButtons(staffStatus, request),
-          ],
-        ),
-      ),
+            body: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildLeaveLetterContent(request),
+                  ),
+                ),
+                _buildLeaveActionButtons(
+                  staffStatus,
+                  request,
+                  isLoading: isLoading,
+                  onLoadingChanged: (val) {
+                    setState(() {
+                      isLoading = val;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1238,7 +1258,12 @@ class _LeaveRequestsStaffPageState extends State<LeaveRequestsStaffPage> {
     );
   }
 
-  Widget _buildLeaveActionButtons(String status, Map<String, dynamic> request) {
+  Widget _buildLeaveActionButtons(
+    String status,
+    Map<String, dynamic> request, {
+    bool isLoading = false,
+    ValueChanged<bool>? onLoadingChanged,
+  }) {
     // Handle both MongoDB ObjectId and String ID from API
     final requestId = request['_id'].toString();
 
@@ -1253,18 +1278,27 @@ class _LeaveRequestsStaffPageState extends State<LeaveRequestsStaffPage> {
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () async {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Processing rejection...'),
-                      duration: Duration(milliseconds: 500),
-                    ),
-                  );
-                  // Call updateStatus which handles the dialog internally
-                  await updateStatus(requestId, 'rejected');
-                },
-                icon: const Icon(Icons.close, size: 18),
+                onPressed:
+                    isLoading
+                        ? null
+                        : () async {
+                          final reason = await _showRejectionReasonDialog();
+                          if (reason != null && reason.isNotEmpty) {
+                            onLoadingChanged?.call(true);
+                            await updateStatusWithReason(
+                              requestId,
+                              'rejected',
+                              reason,
+                            );
+                            if (mounted) {
+                              Navigator.of(context).pop();
+                            }
+                          }
+                        },
+                icon:
+                    isLoading
+                        ? const SizedBox.shrink()
+                        : const Icon(Icons.close, size: 18),
                 label: const Text('Reject'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEF4444),
@@ -1279,20 +1313,40 @@ class _LeaveRequestsStaffPageState extends State<LeaveRequestsStaffPage> {
             const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Forwarding to HOD...'),
-                      duration: Duration(seconds: 1),
-                    ),
-                  );
-                  Future.delayed(const Duration(milliseconds: 300), () {
-                    updateStatus(requestId, 'approved');
-                  });
-                },
-                icon: const Icon(Icons.check, size: 18),
-                label: const Text('Forward to HOD'),
+                onPressed:
+                    isLoading
+                        ? null
+                        : () async {
+                          onLoadingChanged?.call(true);
+                          await updateStatusWithReason(
+                            requestId,
+                            'approved',
+                            '',
+                          );
+                          if (mounted) {
+                            Navigator.of(context).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Forwarded to HOD!'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          }
+                        },
+                icon:
+                    isLoading
+                        ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                        : const Icon(Icons.check, size: 18),
+                label: Text(isLoading ? 'Processing...' : 'Forward to HOD'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF10B981),
                   foregroundColor: Colors.white,

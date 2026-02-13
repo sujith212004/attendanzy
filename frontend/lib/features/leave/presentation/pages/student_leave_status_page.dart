@@ -553,12 +553,13 @@ class _StudentLeaveStatusPageState extends State<StudentLeaveStatusPage>
 
     if (rejectionReason.isNotEmpty || mainStatus == 'rejected') {
       status = 'rejected';
-    } else if (staffStatusRaw == 'accepted' ||
-        staffStatusRaw == 'approved' ||
-        mainStatus == 'accepted') {
+    } else if (mainStatus == 'accepted' ||
+        (staffStatusRaw == 'accepted' &&
+            (req['hodStatus']?.toString().toLowerCase() == 'accepted' ||
+                req['hodStatus']?.toString().toLowerCase() == 'approved'))) {
       status = 'accepted';
     } else {
-      status = staffStatusRaw.isEmpty ? 'pending' : staffStatusRaw;
+      status = 'pending';
     }
 
     final String leaveType = req['leaveType'] ?? 'Leave Request';
@@ -1030,7 +1031,7 @@ class _StudentLeaveStatusPageState extends State<StudentLeaveStatusPage>
                       ),
                       const Spacer(),
                       // Action Button
-                      if (status == 'accepted')
+                      if (isAccepted)
                         Material(
                           color: Colors.transparent,
                           child: InkWell(
@@ -1566,7 +1567,15 @@ class _StudentLeaveStatusPageState extends State<StudentLeaveStatusPage>
 
                     // Download button for approved requests
                     if (status.toLowerCase() == 'approved' ||
-                        status.toLowerCase() == 'accepted') ...[
+                        status.toLowerCase() == 'accepted' ||
+                        request['status']?.toString().toLowerCase() ==
+                            'accepted' ||
+                        request['status']?.toString().toLowerCase() ==
+                            'approved' ||
+                        request['hodStatus']?.toString().toLowerCase() ==
+                            'accepted' ||
+                        request['hodStatus']?.toString().toLowerCase() ==
+                            'approved') ...[
                       const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,

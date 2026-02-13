@@ -703,12 +703,13 @@ class _StudentODStatusPageState extends State<StudentODStatusPage>
 
     if (rejectionReason.isNotEmpty || mainStatus == 'rejected') {
       status = 'rejected';
-    } else if (staffStatusRaw == 'accepted' ||
-        staffStatusRaw == 'approved' ||
-        mainStatus == 'accepted') {
+    } else if (mainStatus == 'accepted' ||
+        (staffStatusRaw == 'accepted' &&
+            (req['hodStatus']?.toString().toLowerCase() == 'accepted' ||
+                req['hodStatus']?.toString().toLowerCase() == 'approved'))) {
       status = 'accepted';
     } else {
-      status = staffStatusRaw.isEmpty ? 'pending' : staffStatusRaw;
+      status = 'pending';
     }
 
     final String subject = req['subject'] ?? 'OD Request';
@@ -1152,7 +1153,7 @@ class _StudentODStatusPageState extends State<StudentODStatusPage>
                       ),
                       const Spacer(),
                       // Action Button
-                      if (status == 'accepted')
+                      if (isAccepted)
                         Material(
                           color: Colors.transparent,
                           child: InkWell(
@@ -1565,7 +1566,14 @@ class _StudentODStatusPageState extends State<StudentODStatusPage>
                             ),
                           ),
                         ],
-                        if (status == 'accepted') ...[
+                        if ((request['status']?.toString().toLowerCase() ==
+                                'accepted' ||
+                            request['status']?.toString().toLowerCase() ==
+                                'approved' ||
+                            request['hodStatus']?.toString().toLowerCase() ==
+                                'accepted' ||
+                            request['hodStatus']?.toString().toLowerCase() ==
+                                'approved')) ...[
                           const SizedBox(height: 28),
                           SizedBox(
                             width: double.infinity,

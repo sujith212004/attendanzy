@@ -164,6 +164,44 @@ router.post('/hod-decision', async (req, res) => {
             error: error.message
         });
     }
+// Generic send notification endpoint
+// Used by frontend for retry logic and custom notifications
+router.post('/send-notification', async (req, res) => {
+    try {
+        const { studentEmail, title, body, data } = req.body;
+
+        if (!studentEmail || !title || !body) {
+            return res.status(400).json({
+                success: false,
+                message: 'studentEmail, title, and body are required'
+            });
+        }
+
+        console.log(`\n========== GENERIC NOTIFICATION ==========`);
+        console.log(`To: ${studentEmail}`);
+        console.log(`Title: ${title}`);
+        
+        const { sendNotificationToUser } = require('../services/notificationService');
+        
+        // Add type to data if not present
+        const notificationData = data || {};
+        if (!notificationData.type) {
+            notificationData.type = 'generic_notification';
+        }
+
+        const result = await sendNotificationToUser(studentEmail, title, body, notificationData);
+
+        console.log(`Result: ${result.success ? 'Success' : 'Failed'}`);
+        console.log(`========== GENERIC NOTIFICATION END ==========\n`);
+
+        res.json(result);
+    } catch (error) {
+        console.error('Error sending generic notification:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
 });
 
 module.exports = router;

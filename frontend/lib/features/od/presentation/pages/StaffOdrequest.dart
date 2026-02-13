@@ -1146,59 +1146,79 @@ class _ODRequestsstaffPageState extends State<ODRequestsstaffPage> {
     } else {
       staffStatus = staffStatusRaw.isEmpty ? 'pending' : staffStatusRaw;
     }
-    return Dialog.fullscreen(
-      child: Scaffold(
-        backgroundColor: const Color(0xFFFAFBFC),
-        appBar: AppBar(
-          title: const Text(
-            'Request Details',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1F2937),
-            ),
-          ),
-          backgroundColor: Colors.white,
-          elevation: 0,
-          leading: IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close, color: Color(0xFF1F2937)),
-          ),
-          actions: [
-            Container(
-              margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: _getStatusBackgroundColor(staffStatus),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                staffStatus.toUpperCase(),
+
+    // We use a StatefulBuilder to manage the loading state locally within the dialog
+    bool isLoading = false;
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return Dialog.fullscreen(
+          child: Scaffold(
+            backgroundColor: const Color(0xFFFAFBFC),
+            appBar: AppBar(
+              title: const Text(
+                'Request Details',
                 style: TextStyle(
-                  color: _getStatusColor(staffStatus),
+                  fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  fontSize: 11,
+                  color: Color(0xFF1F2937),
                 ),
               ),
-            ),
-          ],
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(1),
-            child: Container(height: 1, color: const Color(0xFFE5E7EB)),
-          ),
-        ),
-        body: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: _buildLetterContent(req),
+              backgroundColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close, color: Color(0xFF1F2937)),
+              ),
+              actions: [
+                Container(
+                  margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getStatusBackgroundColor(staffStatus),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    staffStatus.toUpperCase(),
+                    style: TextStyle(
+                      color: _getStatusColor(staffStatus),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Container(height: 1, color: const Color(0xFFE5E7EB)),
               ),
             ),
-            _buildActionButtons(staffStatus, req),
-          ],
-        ),
-      ),
+            body: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildLetterContent(req),
+                  ),
+                ),
+                _buildActionButtons(
+                  staffStatus,
+                  req,
+                  isLoading: isLoading,
+                  onLoadingChanged: (val) {
+                    setState(() {
+                      isLoading = val;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1401,7 +1421,81 @@ class _ODRequestsstaffPageState extends State<ODRequestsstaffPage> {
     );
   }
 
-  Widget _buildActionButtons(String status, Map<String, dynamic> req) {
+  Widget _buildActionButtons(
+    String status,
+    Map<String, dynamic> req, {
+    bool isLoading = false,
+    ValueChanged<bool>? onLoadingChanged,
+  }) {
+    // We need to define isLoading inside the builder if we want it to update
+    // But since we are passing it from the parent, we rely on parent rebuild.
+    // However, StatefulBuilder builder provides a setState that only rebuilds its child.
+    // So the isLoading variable must be defined OUTSIDE the builder if we were using it there,
+    // but here we are using the passed parameters.
+    // The previous tool call wrapped the validation in StatefulBuilder and passed `isLoading` (which was local to that builder?). Not quite.
+    // Wait, the previous tool call defined `bool isLoading = false;` INSIDE the builder.
+    // That means `isLoading` resets to false on every rebuild of the StatefulBuilder?
+    // No, `StatefulBuilder`'s builder is called only once initially? No, it's called on setState.
+    // Actually, `StatefulBuilder` doesn't hold state across its own rebuilds if the state variable is defined inside the builder function.
+    // It needs to be defined outside? Or `StatefulBuilder` creates a context for `setState`.
+    // The boolean variable `isLoading` should be held in the state of `_buildFullScreenDialog` if it were a widget,
+    // or we can't persist it inside `builder`.
+    //
+    // WAIT. `StatefulBuilder` builder signature is `Widget Function(BuildContext, StateSetter)`.
+    // If I define `bool isLoading = false;` inside the builder, it initializes to false.
+    // When I call `setState(() { isLoading = true; })`, it triggers a rebuild of the builder.
+    // The builder runs again. `bool isLoading = false;` executes again. `isLoading` becomes false.
+    // This is a common mistake.
+    //
+    // Verification:
+    // If I use `StatefulBuilder`, I should usually wrap a widget that holds the state, or the state variable should be outside.
+    // But `_buildFullScreenDialog` is a method, not a class.
+    // So I should define `bool isLoading = false;` *outside* the `StatefulBuilder`?
+    // If I define it outside, it's a local variable of `_buildFullScreenDialog`.
+    // `StatefulBuilder`'s `setState` won't update the local variable of the surrounding function?
+    // Actually, closures capture variables.
+    //
+    // Let's correct `_buildFullScreenDialog` logic in the NEXT step if I messed up (I suspect I might have, but let's see).
+    // Actually, if I defined it inside, it is definitely wrong.
+    //
+    // I will fix `_buildFullScreenDialog` and `_buildActionButtons` together here? No, I can't edit the same file in parallel overlapping regions easily or I might have race conditions if I didn't wait.
+    // But I already sent the previous tool call.
+    // If I made a mistake in the previous tool call, I need to fix it.
+    //
+    // Let's assume I need to fix `_buildActionButtons` now.
+    // AND I should fix the `StatefulBuilder` usage.
+    //
+    // Actually, I can use a separate widget class for the dialog to be safe, OR:
+    // Define `bool isLoading = false;` *before* `return StatefulBuilder(...)`.
+    // And inside `StatefulBuilder`, I use that variable.
+    // Since `isLoading` is captured by the closure, `setState` will trigger a rebuild, and the builder uses the captured variable.
+    //
+    // Wait, the Previous tool call:
+    // ```dart
+    //     // We use a StatefulBuilder...
+    //     return StatefulBuilder(
+    //       builder: (context, setState) {
+    //         bool isLoading = false; // <--- ERROR: This resets it every time.
+    //         return Dialog.fullscreen(...
+    // ```
+    // Yes, that is an error.
+    //
+    // I need to correct `_buildFullScreenDialog` FIRST or ALONG with `_buildActionButtons`.
+    // Since I'm editing `_buildActionButtons` (lines 1404-1506), I can't touch lines 1130-1203 in the same atomic `replace_file_content` call?
+    // Actually `multi_replace_file_content` exists! I should use that.
+    //
+    // But I already issued a `replace_file_content` for `_buildFullScreenDialog` in the previous step.
+    // So the file *currently* has the bug.
+    // I need to fix it.
+    //
+    // I will simply perform a `replace_file_content` on `_buildFullScreenDialog` AGAIN to fix the variable scope,
+    // AND then update `_buildActionButtons`.
+    // OR better, do both in one `multi_replace_file_content`.
+    //
+    // Actually, I am in the prompt *after* the previous tool call.
+    // So the previous tool call *has happened*.
+    // I will fix the `isLoading` placement in `_buildFullScreenDialog` AND update `_buildActionButtons` using `multi_replace_file_content`.
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -1421,14 +1515,30 @@ class _ODRequestsstaffPageState extends State<ODRequestsstaffPage> {
         children: [
           Expanded(
             child: ElevatedButton.icon(
-              icon: const Icon(Icons.check_circle_outline, size: 20),
-              label: const Text(
-                'Forward to HOD',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              icon:
+                  isLoading
+                      ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                      : const Icon(Icons.check_circle_outline, size: 20),
+              label: Text(
+                isLoading ? 'Processing...' : 'Forward to HOD',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               onPressed:
-                  status == 'pending'
+                  (status == 'pending' && !isLoading)
                       ? () async {
+                        onLoadingChanged?.call(true);
                         await updateStatus(req['_id'].toString(), 'accepted');
                         if (mounted) {
                           Navigator.of(context).pop();
@@ -1458,30 +1568,28 @@ class _ODRequestsstaffPageState extends State<ODRequestsstaffPage> {
           const SizedBox(width: 16),
           Expanded(
             child: ElevatedButton.icon(
-              icon: const Icon(Icons.cancel_outlined, size: 20),
+              icon:
+                  isLoading
+                      ? const SizedBox.shrink()
+                      : const Icon(Icons.cancel_outlined, size: 20),
               label: const Text(
                 'Reject',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
               onPressed:
-                  status == 'pending'
+                  (status == 'pending' && !isLoading)
                       ? () async {
                         final reason = await _showRejectionReasonDialog();
                         if (reason != null && reason.isNotEmpty) {
-                          Navigator.of(context).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Rejecting...'),
-                              duration: Duration(seconds: 1),
-                            ),
+                          onLoadingChanged?.call(true);
+                          await updateStatusWithReason(
+                            req['_id'].toString(),
+                            'rejected',
+                            reason,
                           );
-                          Future.delayed(const Duration(milliseconds: 300), () {
-                            updateStatusWithReason(
-                              req['_id'].toString(),
-                              'rejected',
-                              reason,
-                            );
-                          });
+                          if (mounted) {
+                            Navigator.of(context).pop();
+                          }
                         }
                       }
                       : null,

@@ -142,28 +142,15 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
       await db.close();
 
       // Send notification to student via backend
-      try {
-        final notifUrl = Uri.parse(
-          '${LocalConfig.apiBaseUrl}/notifications/hod-decision',
-        );
-        await http.post(
-          notifUrl,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'studentEmail': studentEmail,
-            'studentName': studentName,
-            'requestType': 'OD',
-            'status': hodStatusValue,
-          }),
-        );
-        if (kDebugMode) {
-          print('DEBUG: HOD decision notification sent for OD request $id');
-        }
-      } catch (notifErr) {
-        if (kDebugMode) {
-          print('DEBUG: Failed to send notification: $notifErr');
-        }
-      }
+      // Send notification to student via backend with retry
+      // We process this in background so UI doesn't freeze, but we ensure it runs
+      _sendNotificationWithRetry(
+        studentEmail: studentEmail,
+        studentName: studentName,
+        requestType: 'OD',
+        status: hodStatusValue,
+        requestId: id,
+      );
 
       await fetchRequests();
 
@@ -968,67 +955,85 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
   }
 
   void _showODDetailDialog(Map<String, dynamic> req) {
+    if (!mounted) return;
     final status = req['status']?.toString().toLowerCase() ?? 'pending';
+
     showDialog(
       context: context,
-      builder:
-          (context) => Dialog.fullscreen(
-            child: Scaffold(
-              backgroundColor: const Color(0xFFFAFBFC),
-              appBar: AppBar(
-                title: const Text(
-                  'OD Request Details',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937),
+      builder: (context) {
+        bool isLoading = false;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog.fullscreen(
+              child: Scaffold(
+                backgroundColor: const Color(0xFFFAFBFC),
+                appBar: AppBar(
+                  title: const Text(
+                    'OD Request Details',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1F2937),
+                    ),
                   ),
-                ),
-                backgroundColor: Colors.white,
-                elevation: 0,
-                leading: IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close, color: Color(0xFF1F2937)),
-                ),
-                actions: [
-                  Container(
-                    margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getStatusBackgroundColor(status),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      status.toUpperCase(),
-                      style: TextStyle(
-                        color: _getStatusColor(status),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 11,
+                  backgroundColor: Colors.white,
+                  elevation: 0,
+                  leading: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close, color: Color(0xFF1F2937)),
+                  ),
+                  actions: [
+                    Container(
+                      margin: const EdgeInsets.only(
+                        right: 16,
+                        top: 8,
+                        bottom: 8,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getStatusBackgroundColor(status),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        status.toUpperCase(),
+                        style: TextStyle(
+                          color: _getStatusColor(status),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
+                  ],
+                  bottom: PreferredSize(
+                    preferredSize: const Size.fromHeight(1),
+                    child: Container(height: 1, color: const Color(0xFFE5E7EB)),
                   ),
-                ],
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(1),
-                  child: Container(height: 1, color: const Color(0xFFE5E7EB)),
+                ),
+                body: Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: _buildLetterContent(req),
+                      ),
+                    ),
+                    _buildActionButtons(
+                      status,
+                      req,
+                      isLoading: isLoading,
+                      onLoadingChanged:
+                          (val) => setState(() => isLoading = val),
+                    ),
+                  ],
                 ),
               ),
-              body: Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: _buildLetterContent(req),
-                    ),
-                  ),
-                  _buildActionButtons(status, req),
-                ],
-              ),
-            ),
-          ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -1179,7 +1184,12 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
     );
   }
 
-  Widget _buildActionButtons(String status, Map<String, dynamic> req) {
+  Widget _buildActionButtons(
+    String status,
+    Map<String, dynamic> req, {
+    bool isLoading = false,
+    ValueChanged<bool>? onLoadingChanged,
+  }) {
     final isPending = status == 'pending' || status == 'pending_hod';
 
     return Container(
@@ -1191,7 +1201,7 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             offset: const Offset(0, -4),
             blurRadius: 16,
           ),
@@ -1203,19 +1213,42 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      icon: const Icon(Icons.check_circle_outline, size: 20),
-                      label: const Text(
-                        'Accept',
-                        style: TextStyle(
+                      icon:
+                          isLoading
+                              ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                              : const Icon(
+                                Icons.check_circle_outline,
+                                size: 20,
+                              ),
+                      label: Text(
+                        isLoading ? 'Processing...' : 'Accept',
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       onPressed:
-                          () => updateStatus(
-                            req['_id'].toHexString(),
-                            'accepted',
-                          ),
+                          isLoading
+                              ? null
+                              : () async {
+                                onLoadingChanged?.call(true);
+                                await updateStatus(
+                                  req['_id'].toHexString(),
+                                  'accepted',
+                                );
+                                if (mounted && Navigator.of(context).canPop()) {
+                                  Navigator.of(context).pop();
+                                }
+                              },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF10B981),
                         foregroundColor: Colors.white,
@@ -1230,7 +1263,10 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton.icon(
-                      icon: const Icon(Icons.cancel_outlined, size: 20),
+                      icon:
+                          isLoading
+                              ? const SizedBox.shrink()
+                              : const Icon(Icons.cancel_outlined, size: 20),
                       label: const Text(
                         'Reject',
                         style: TextStyle(
@@ -1238,15 +1274,25 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      onPressed: () async {
-                        final reason = await _showRejectionReasonDialog();
-                        if (reason == null || reason.trim().isEmpty) return;
-                        await updateStatus(
-                          req['_id'].toHexString(),
-                          'rejected',
-                          reason: reason.trim(),
-                        );
-                      },
+                      onPressed:
+                          isLoading
+                              ? null
+                              : () async {
+                                final reason =
+                                    await _showRejectionReasonDialog();
+                                if (reason == null || reason.trim().isEmpty) {
+                                  return;
+                                }
+                                onLoadingChanged?.call(true);
+                                await updateStatus(
+                                  req['_id'].toHexString(),
+                                  'rejected',
+                                  reason: reason.trim(),
+                                );
+                                if (mounted && Navigator.of(context).canPop()) {
+                                  Navigator.of(context).pop();
+                                }
+                              },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFEF4444),
                         foregroundColor: Colors.white,
@@ -1267,7 +1313,7 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
                   color: _getStatusBackgroundColor(status),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: _getStatusColor(status).withValues(alpha: 0.3),
+                    color: _getStatusColor(status).withOpacity(0.3),
                     width: 1,
                   ),
                 ),
@@ -1433,6 +1479,69 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
       return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
     } catch (e) {
       return dateTimeValue.toString();
+    }
+  }
+
+  Future<void> _sendNotificationWithRetry({
+    required String studentEmail,
+    required String studentName,
+    required String requestType,
+    required String status,
+    required String requestId,
+  }) async {
+    const int maxRetries = 3;
+    const Duration initialDelay = Duration(seconds: 2);
+
+    for (int i = 0; i < maxRetries; i++) {
+      try {
+        if (kDebugMode) {
+          print(
+            'DEBUG: Sending notification for $requestType $requestId (Attempt ${i + 1}/$maxRetries)...',
+          );
+        }
+
+        final notifUrl = Uri.parse(
+          '${LocalConfig.apiBaseUrl}/notifications/hod-decision',
+        );
+
+        final response = await http
+            .post(
+              notifUrl,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'studentEmail': studentEmail,
+                'studentName': studentName,
+                'requestType': requestType,
+                'status': status,
+              }),
+            )
+            .timeout(const Duration(seconds: 20));
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          if (kDebugMode) {
+            print(
+              'DEBUG: Notification sent successfully for $requestType request $requestId',
+            );
+          }
+          return;
+        } else {
+          throw Exception(
+            'Server returned ${response.statusCode}: ${response.body}',
+          );
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('DEBUG: Notification attempt ${i + 1} failed: $e');
+        }
+        if (i < maxRetries - 1) {
+          await Future.delayed(initialDelay * (i + 1)); // Linear backoff
+        }
+      }
+    }
+    if (kDebugMode) {
+      print(
+        'DEBUG: Failed to send notification for $requestId after $maxRetries attempts.',
+      );
     }
   }
 }

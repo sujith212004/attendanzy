@@ -143,30 +143,14 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
 
       if (updateResult.isSuccess) {
         // Send notification to student via backend
-        try {
-          final notifUrl = Uri.parse(
-            '${LocalConfig.apiBaseUrl}/notifications/hod-decision',
-          );
-          await http.post(
-            notifUrl,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'studentEmail': studentEmail,
-              'studentName': studentName,
-              'requestType': 'Leave',
-              'status': hodStatusValue,
-            }),
-          );
-          if (kDebugMode) {
-            print(
-              'DEBUG: HOD decision notification sent for Leave request $id',
-            );
-          }
-        } catch (notifErr) {
-          if (kDebugMode) {
-            print('DEBUG: Failed to send notification: $notifErr');
-          }
-        }
+        // Send notification to student via backend with retry
+        _sendNotificationWithRetry(
+          studentEmail: studentEmail,
+          studentName: studentName,
+          requestType: 'Leave',
+          status: hodStatusValue,
+          requestId: id,
+        );
 
         await fetchRequests();
         _showSnackBar(
@@ -866,67 +850,85 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
   }
 
   void _showLeaveDetailDialog(Map<String, dynamic> request) {
+    if (!mounted) return;
     final status = request['status']?.toString().toLowerCase() ?? 'pending';
+
     showDialog(
       context: context,
-      builder:
-          (context) => Dialog.fullscreen(
-            child: Scaffold(
-              backgroundColor: const Color(0xFFFAFBFC),
-              appBar: AppBar(
-                title: const Text(
-                  'Leave Request Details',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937),
+      builder: (context) {
+        bool isLoading = false;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog.fullscreen(
+              child: Scaffold(
+                backgroundColor: const Color(0xFFFAFBFC),
+                appBar: AppBar(
+                  title: const Text(
+                    'Leave Request Details',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1F2937),
+                    ),
                   ),
-                ),
-                backgroundColor: Colors.white,
-                elevation: 0,
-                leading: IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close, color: Color(0xFF1F2937)),
-                ),
-                actions: [
-                  Container(
-                    margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getStatusBackgroundColor(status),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      status.toUpperCase(),
-                      style: TextStyle(
-                        color: _getStatusColor(status),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 11,
+                  backgroundColor: Colors.white,
+                  elevation: 0,
+                  leading: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close, color: Color(0xFF1F2937)),
+                  ),
+                  actions: [
+                    Container(
+                      margin: const EdgeInsets.only(
+                        right: 16,
+                        top: 8,
+                        bottom: 8,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getStatusBackgroundColor(status),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        status.toUpperCase(),
+                        style: TextStyle(
+                          color: _getStatusColor(status),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
+                  ],
+                  bottom: PreferredSize(
+                    preferredSize: const Size.fromHeight(1),
+                    child: Container(height: 1, color: const Color(0xFFE5E7EB)),
                   ),
-                ],
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(1),
-                  child: Container(height: 1, color: const Color(0xFFE5E7EB)),
+                ),
+                body: Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: _buildLeaveLetterContent(request),
+                      ),
+                    ),
+                    _buildLeaveActionButtons(
+                      status,
+                      request,
+                      isLoading: isLoading,
+                      onLoadingChanged:
+                          (val) => setState(() => isLoading = val),
+                    ),
+                  ],
                 ),
               ),
-              body: Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: _buildLeaveLetterContent(request),
-                    ),
-                  ),
-                  _buildLeaveActionButtons(status, request),
-                ],
-              ),
-            ),
-          ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -1103,7 +1105,12 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
     );
   }
 
-  Widget _buildLeaveActionButtons(String status, Map<String, dynamic> request) {
+  Widget _buildLeaveActionButtons(
+    String status,
+    Map<String, dynamic> request, {
+    bool isLoading = false,
+    ValueChanged<bool>? onLoadingChanged,
+  }) {
     final requestId = request['_id']?.toHexString() ?? '';
 
     if (status.toLowerCase() == 'pending' ||
@@ -1118,17 +1125,25 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () async {
-                  final reason = await _showRejectionReasonDialog();
-                  if (reason == null || reason.trim().isEmpty) return;
-                  await updateStatus(
-                    requestId,
-                    'rejected',
-                    reason: reason.trim(),
-                  );
-                  if (mounted) Navigator.of(context).pop();
-                },
-                icon: const Icon(Icons.close, size: 18),
+                onPressed:
+                    isLoading
+                        ? null
+                        : () async {
+                          final reason = await _showRejectionReasonDialog();
+                          if (reason == null || reason.trim().isEmpty) return;
+
+                          onLoadingChanged?.call(true);
+                          await updateStatus(
+                            requestId,
+                            'rejected',
+                            reason: reason.trim(),
+                          );
+                          if (mounted) Navigator.of(context).pop();
+                        },
+                icon:
+                    isLoading
+                        ? const SizedBox.shrink()
+                        : const Icon(Icons.close, size: 18),
                 label: const Text('Reject'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEF4444),
@@ -1143,12 +1158,28 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
             const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () async {
-                  await updateStatus(requestId, 'approved');
-                  if (mounted) Navigator.of(context).pop();
-                },
-                icon: const Icon(Icons.check, size: 18),
-                label: const Text('Approve'),
+                onPressed:
+                    isLoading
+                        ? null
+                        : () async {
+                          onLoadingChanged?.call(true);
+                          await updateStatus(requestId, 'approved');
+                          if (mounted) Navigator.of(context).pop();
+                        },
+                icon:
+                    isLoading
+                        ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                        : const Icon(Icons.check, size: 18),
+                label: Text(isLoading ? 'Processing...' : 'Approve'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF10B981),
                   foregroundColor: Colors.white,
@@ -1176,7 +1207,7 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
             color: _getStatusBackgroundColor(status),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: _getStatusColor(status).withValues(alpha: 0.3),
+              color: _getStatusColor(status).withOpacity(0.3),
               width: 1,
             ),
           ),
@@ -1343,6 +1374,69 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
       return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
     } catch (e) {
       return dateTimeValue.toString();
+    }
+  }
+
+  Future<void> _sendNotificationWithRetry({
+    required String studentEmail,
+    required String studentName,
+    required String requestType,
+    required String status,
+    required String requestId,
+  }) async {
+    const int maxRetries = 3;
+    const Duration initialDelay = Duration(seconds: 2);
+
+    for (int i = 0; i < maxRetries; i++) {
+      try {
+        if (kDebugMode) {
+          print(
+            'DEBUG: Sending notification for $requestType $requestId (Attempt ${i + 1}/$maxRetries)...',
+          );
+        }
+
+        final notifUrl = Uri.parse(
+          '${LocalConfig.apiBaseUrl}/notifications/hod-decision',
+        );
+
+        final response = await http
+            .post(
+              notifUrl,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'studentEmail': studentEmail,
+                'studentName': studentName,
+                'requestType': requestType,
+                'status': status,
+              }),
+            )
+            .timeout(const Duration(seconds: 20));
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          if (kDebugMode) {
+            print(
+              'DEBUG: Notification sent successfully for $requestType request $requestId',
+            );
+          }
+          return;
+        } else {
+          throw Exception(
+            'Server returned ${response.statusCode}: ${response.body}',
+          );
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('DEBUG: Notification attempt ${i + 1} failed: $e');
+        }
+        if (i < maxRetries - 1) {
+          await Future.delayed(initialDelay * (i + 1)); // Linear backoff
+        }
+      }
+    }
+    if (kDebugMode) {
+      print(
+        'DEBUG: Failed to send notification for $requestId after $maxRetries attempts.',
+      );
     }
   }
 }
