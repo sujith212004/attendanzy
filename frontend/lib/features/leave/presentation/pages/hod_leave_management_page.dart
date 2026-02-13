@@ -1387,6 +1387,25 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
     const int maxRetries = 3;
     const Duration initialDelay = Duration(seconds: 2);
 
+    // Construct notification content
+    final statusText = status.toLowerCase();
+    String title;
+    String body;
+
+    if (statusText == 'approved' || statusText == 'accepted') {
+      title = '$requestType Request Approved';
+      body =
+          'Hi $studentName, your ${requestType.toLowerCase()} request has been approved by HOD.';
+    } else if (statusText == 'rejected') {
+      title = '$requestType Request Rejected';
+      body =
+          'Hi $studentName, your ${requestType.toLowerCase()} request has been rejected by HOD.';
+    } else {
+      title = '$requestType Request Update';
+      body =
+          'Hi $studentName, your ${requestType.toLowerCase()} request status has been updated to $status.';
+    }
+
     for (int i = 0; i < maxRetries; i++) {
       try {
         if (kDebugMode) {
@@ -1396,7 +1415,7 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
         }
 
         final notifUrl = Uri.parse(
-          '${LocalConfig.apiBaseUrl}/notifications/hod-decision',
+          '${LocalConfig.apiBaseUrl}/notifications/send-notification',
         );
 
         final response = await http
@@ -1405,12 +1424,18 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode({
                 'studentEmail': studentEmail,
-                'studentName': studentName,
-                'requestType': requestType,
-                'status': status,
+                'title': title,
+                'body': body,
+                'data': {
+                  'type': 'hod_decision',
+                  'requestType': requestType,
+                  'status': status,
+                  'requestId': requestId,
+                  'approverRole': 'hod',
+                },
               }),
             )
-            .timeout(const Duration(seconds: 20));
+            .timeout(const Duration(seconds: 30));
 
         if (response.statusCode >= 200 && response.statusCode < 300) {
           if (kDebugMode) {

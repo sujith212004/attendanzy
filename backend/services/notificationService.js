@@ -79,18 +79,21 @@ const sendNotificationToToken = async (token, title, body, data = {}) => {
  */
 const sendNotificationToUser = async (userEmail, title, body, data = {}) => {
     try {
+        console.log(`[NOTIF-DEBUG] sendNotificationToUser called for: ${userEmail}`);
+
         // Find user in all collections (User, Staff, HOD) and get their FCM token
         const emailLower = userEmail.toLowerCase().trim();
-        console.log(`Looking for user with email: ${emailLower}`);
 
         // Escape regex special chars for safety
         const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const emailRegex = new RegExp(`^${escapeRegExp(emailLower)}$`, 'i');
 
+        console.log(`[NOTIF-DEBUG] Searching for user in 'users' collection...`);
         let user = await User.findOne({ email: emailRegex });
         let userType = 'Student';
 
         if (!user) {
+            console.log(`[NOTIF-DEBUG] Not found in 'users', searching 'staff'...`);
             user = await Staff.findOne({
                 $or: [
                     { email: emailLower },
@@ -103,6 +106,7 @@ const sendNotificationToUser = async (userEmail, title, body, data = {}) => {
         }
 
         if (!user) {
+            console.log(`[NOTIF-DEBUG] Not found in 'staff', searching 'hod'...`);
             user = await HOD.findOne({
                 $or: [
                     { email: emailLower },
@@ -115,24 +119,29 @@ const sendNotificationToUser = async (userEmail, title, body, data = {}) => {
         }
 
         if (!user) {
-            console.log(`User not found: ${userEmail}`);
-            return { success: false, message: 'User not found' };
+            console.log(`[NOTIF-DEBUG] ❌ User completely not found: ${userEmail}`);
+            return { success: false, message: 'User not found in any collection' };
         }
 
-        console.log(`Found ${userType}: ${user.name || user.Name} (${user.email || user['College Email']})`);
+        console.log(`[NOTIF-DEBUG] ✅ Found ${userType}: ${user.name || user.Name} (${user.email || user['College Email']})`);
 
         if (!user.fcmToken) {
-            console.log(`No FCM token found for ${userType}: ${userEmail}`);
-            return { success: false, message: 'FCM token not found' };
+            console.log(`[NOTIF-DEBUG] ❌ No FCM token found for user: ${userEmail}`);
+            return { success: false, message: 'FCM token not found for user' };
         }
 
+        console.log(`[NOTIF-DEBUG] Token found (len: ${user.fcmToken.length}). Sending to Firebase...`);
         const result = await sendNotificationToToken(user.fcmToken, title, body, data);
+
         if (result.success) {
-            console.log(`Notification sent to ${userEmail}:`, result.messageId);
+            console.log(`[NOTIF-DEBUG] ✅ Notification successfully handed to Firebase. MsgID: ${result.messageId}`);
+        } else {
+            console.error(`[NOTIF-DEBUG] ❌ Firebase sending failed: ${result.error}`);
         }
+
         return result;
     } catch (error) {
-        console.error(`Error sending notification to ${userEmail}:`, error);
+        console.error(`[NOTIF-DEBUG] ❌ Exception in sendNotificationToUser:`, error);
         return { success: false, error: error.message };
     }
 };
