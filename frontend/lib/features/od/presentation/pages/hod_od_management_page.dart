@@ -1206,7 +1206,7 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
                                 onLoadingChanged?.call(true);
                                 await updateStatus(
                                   req['_id'].toString(),
-                                  'accepted',
+                                  'approved',
                                 );
                               },
                       style: ElevatedButton.styleFrom(
