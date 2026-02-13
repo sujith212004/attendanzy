@@ -1,12 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:mongo_dart/mongo_dart.dart' as mongo;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/widgets/mac_folder_fullpage.dart';
-import '../../../../core/config/local_config.dart';
+import '../../../../core/services/api_service.dart';
 
 /// HOD OD Management Page with Mac-style folder UI
 class HodOdManagementPage extends StatefulWidget {
@@ -17,9 +15,6 @@ class HodOdManagementPage extends StatefulWidget {
 }
 
 class _HodOdManagementPageState extends State<HodOdManagementPage> {
-  final String mongoUri = LocalConfig.mongoUri;
-  final String collectionName = "od_requests";
-
   List<Map<String, dynamic>> requests = [];
   bool loading = true;
   String? error;
@@ -58,36 +53,28 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
     });
 
     try {
-      final db = await mongo.Db.create(mongoUri);
-      await db.open();
-      final collection = db.collection(collectionName);
-
-      // Fetch requests forwarded by staff (staffStatus = 'approved')
-      final query = mongo.where
-          .eq('department', hodDepartment)
-          .eq('staffStatus', 'approved')
-          .sortBy('createdAt', descending: true);
-
       if (kDebugMode) {
         print(
-          "DEBUG: Executing MongoDB query for OD requests (department=$hodDepartment)",
+          "DEBUG: Fetching OD requests for HOD (department=$hodDepartment)",
         );
       }
-      final result = await collection.find(query).toList();
 
-      if (kDebugMode) {
-        print("DEBUG: Fetched ${result.length} requests");
-      }
+      final result = await ApiService.getHODODRequests(
+        department: hodDepartment!,
+      );
 
-      if (kDebugMode) {
-        print("DEBUG: Found ${result.length} OD requests for this department.");
-      }
-
-      await db.close();
       if (mounted) {
         setState(() {
-          requests = List<Map<String, dynamic>>.from(result);
-          loading = false;
+          if (result['success'] == true) {
+            requests = List<Map<String, dynamic>>.from(result['data']);
+            loading = false;
+            if (kDebugMode) {
+              print("DEBUG: Fetched ${requests.length} OD requests via API.");
+            }
+          } else {
+            error = result['message'] ?? 'Failed to fetch requests';
+            loading = false;
+          }
         });
       }
     } catch (e) {
@@ -105,62 +92,38 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
 
   Future<void> updateStatus(String id, String status, {String? reason}) async {
     try {
-      final db = await mongo.Db.create(mongoUri);
-      await db.open();
-      final collection = db.collection(collectionName);
-
-      // Map status for hodStatus field: 'accepted' -> 'approved'
-      final hodStatusValue =
-          status.toLowerCase() == 'accepted'
-              ? 'approved'
-              : status.toLowerCase();
-
-      var modifier = mongo.modify
-          .set('status', status)
-          .set('hodStatus', hodStatusValue)
-          .set('updatedAt', DateTime.now());
-
-      if (status.toLowerCase() == 'rejected') {
-        modifier = modifier
-            .set('rejectedBy', 'hod')
-            .set('rejectionReason', reason ?? '')
-            .set('status', 'rejected')
-            .set('hodStatus', 'rejected');
+      if (kDebugMode) {
+        print(
+          "DEBUG: Updating OD request status via API: id=$id, status=$status",
+        );
       }
 
-      // Get the request details before updating (for notification)
-      final request = await collection.findOne(
-        mongo.where.id(mongo.ObjectId.parse(id)),
-      );
-      final studentEmail = request?['studentEmail'] ?? '';
-      final studentName = request?['studentName'] ?? 'Student';
-
-      await collection.updateOne(
-        mongo.where.id(mongo.ObjectId.parse(id)),
-        modifier,
-      );
-      await db.close();
-
-      // Send notification to student via backend
-      // Send notification to student via backend with retry
-      // We process this in background so UI doesn't freeze, but we ensure it runs
-      _sendNotificationWithRetry(
-        studentEmail: studentEmail,
-        studentName: studentName,
-        requestType: 'OD',
-        status: hodStatusValue,
-        requestId: id,
+      final result = await ApiService.updateHODODRequestStatus(
+        id: id,
+        status: status,
+        remarks: reason,
       );
 
-      await fetchRequests();
-
-      if (mounted) {
-        Navigator.of(context).pop();
-        _showSnackBar('Request has been $status.', Colors.green);
+      if (result['success'] == true) {
+        if (kDebugMode) {
+          print("DEBUG: Status updated successfully via API");
+        }
+        await fetchRequests();
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+          _showSnackBar('Request has been $status.', Colors.green);
+        }
+      } else {
+        if (mounted) {
+          _showSnackBar(
+            'Failed to update status: ${result['message']}',
+            Colors.red,
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('Failed to update status: $e', Colors.red);
+        _showSnackBar('An error occurred: $e', Colors.red);
       }
     }
   }
@@ -1242,12 +1205,9 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
                               : () async {
                                 onLoadingChanged?.call(true);
                                 await updateStatus(
-                                  req['_id'].toHexString(),
+                                  req['_id'].toString(),
                                   'accepted',
                                 );
-                                if (mounted && Navigator.of(context).canPop()) {
-                                  Navigator.of(context).pop();
-                                }
                               },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF10B981),
@@ -1285,13 +1245,10 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
                                 }
                                 onLoadingChanged?.call(true);
                                 await updateStatus(
-                                  req['_id'].toHexString(),
+                                  req['_id'].toString(),
                                   'rejected',
                                   reason: reason.trim(),
                                 );
-                                if (mounted && Navigator.of(context).canPop()) {
-                                  Navigator.of(context).pop();
-                                }
                               },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFEF4444),
@@ -1479,94 +1436,6 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
       return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
     } catch (e) {
       return dateTimeValue.toString();
-    }
-  }
-
-  Future<void> _sendNotificationWithRetry({
-    required String studentEmail,
-    required String studentName,
-    required String requestType,
-    required String status,
-    required String requestId,
-  }) async {
-    const int maxRetries = 3;
-    const Duration initialDelay = Duration(seconds: 2);
-
-    // Construct notification content
-    final statusText = status.toLowerCase();
-    String title;
-    String body;
-
-    if (statusText == 'approved' || statusText == 'accepted') {
-      title = '$requestType Request Accepted';
-      body =
-          'Hi $studentName, your ${requestType.toLowerCase()} request has been accepted by HOD.';
-    } else if (statusText == 'rejected') {
-      title = '$requestType Request Rejected';
-      body =
-          'Hi $studentName, your ${requestType.toLowerCase()} request has been rejected by HOD.';
-    } else {
-      title = '$requestType Request Update';
-      body =
-          'Hi $studentName, your ${requestType.toLowerCase()} request status has been updated to $status.';
-    }
-
-    for (int i = 0; i < maxRetries; i++) {
-      try {
-        if (kDebugMode) {
-          print(
-            'DEBUG: Sending notification for $requestType $requestId (Attempt ${i + 1}/$maxRetries)...',
-          );
-        }
-
-        final notifUrl = Uri.parse(
-          '${LocalConfig.apiBaseUrl}/notifications/send-notification',
-        );
-
-        final response = await http
-            .post(
-              notifUrl,
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({
-                'studentEmail': studentEmail,
-                'title': title,
-                'body': body,
-                'data': {
-                  'type': 'hod_decision',
-                  'requestType': requestType,
-                  'status': status,
-                  'requestId': requestId,
-                  'approverRole': 'hod',
-                },
-              }),
-            )
-            .timeout(const Duration(seconds: 30)); // Increased timeout
-
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          if (kDebugMode) {
-            print(
-              'DEBUG: Notification sent successfully for $requestType request $requestId',
-            );
-          }
-          return;
-        } else {
-          throw Exception(
-            'Server returned ${response.statusCode}: ${response.body}',
-          );
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print('DEBUG: Notification attempt ${i + 1} failed: $e');
-        }
-        if (i < maxRetries - 1) {
-          await Future.delayed(initialDelay * (i + 1)); // Linear backoff
-        }
-      }
-    }
-    if (kDebugMode) {
-      print(
-        'DEBUG: Failed to send notification for $requestId after $maxRetries attempts.',
-      );
     }
   }
 }

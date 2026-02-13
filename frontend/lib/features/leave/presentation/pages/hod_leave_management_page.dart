@@ -1,12 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:mongo_dart/mongo_dart.dart' as mongo;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/widgets/mac_folder_fullpage.dart';
-import '../../../../core/config/local_config.dart';
+import '../../../../core/services/api_service.dart';
 
 /// HOD Leave Management Page with Mac-style folder UI
 class HodLeaveManagementPage extends StatefulWidget {
@@ -17,9 +15,6 @@ class HodLeaveManagementPage extends StatefulWidget {
 }
 
 class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
-  final String mongoUri = LocalConfig.mongoUri;
-  final String collectionName = "leave_requests";
-
   List<Map<String, dynamic>> requests = [];
   bool loading = true;
   String? error;
@@ -58,31 +53,30 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
     });
 
     try {
-      final db = await mongo.Db.create(mongoUri);
-      await db.open();
-      final collection = db.collection(collectionName);
-
-      final query = mongo.where
-          .eq('department', hodDepartment)
-          .eq('staffStatus', 'approved')
-          .sortBy('createdAt', descending: true);
-
-      if (kDebugMode) {
-        print("DEBUG: Executing MongoDB query for department: $hodDepartment");
-      }
-      final result = await collection.find(query).toList();
-
       if (kDebugMode) {
         print(
-          "DEBUG: Found ${result.length} leave requests for this department.",
+          "DEBUG: Fetching Leave requests for HOD (department=$hodDepartment)",
         );
       }
 
-      await db.close();
+      final result = await ApiService.getHODLeaveRequests(
+        department: hodDepartment!,
+      );
+
       if (mounted) {
         setState(() {
-          requests = List<Map<String, dynamic>>.from(result);
-          loading = false;
+          if (result['success'] == true) {
+            requests = List<Map<String, dynamic>>.from(result['data']);
+            loading = false;
+            if (kDebugMode) {
+              print(
+                "DEBUG: Fetched ${requests.length} leave requests via API.",
+              );
+            }
+          } else {
+            error = result['message'] ?? 'Failed to fetch requests';
+            loading = false;
+          }
         });
       }
     } catch (e) {
@@ -104,64 +98,41 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
     String? reason,
   }) async {
     try {
-      final db = await mongo.Db.create(mongoUri);
-      await db.open();
-      final collection = db.collection(collectionName);
-
-      final objectId = mongo.ObjectId.fromHexString(id);
-
-      // Map finalDecision for hodStatus: keep as 'approved'/'rejected'
-      final hodStatusValue =
-          finalDecision.toLowerCase() == 'accepted'
-              ? 'approved'
-              : finalDecision.toLowerCase();
-
-      var modifier = mongo.modify
-          .set('status', finalDecision)
-          .set('hodStatus', hodStatusValue)
-          .set('updatedAt', DateTime.now());
-
-      if (finalDecision.toLowerCase() == 'rejected') {
-        modifier = modifier
-            .set('rejectedBy', 'hod')
-            .set('rejectionReason', reason ?? '')
-            .set('status', 'rejected')
-            .set('hodStatus', 'rejected');
+      if (kDebugMode) {
+        print(
+          "DEBUG: Updating Leave request status via API: id=$id, status=$finalDecision",
+        );
       }
 
-      // Get the request details before updating (for notification)
-      final request = await collection.findOne(mongo.where.eq('_id', objectId));
-      final studentEmail = request?['studentEmail'] ?? '';
-      final studentName = request?['studentName'] ?? 'Student';
-
-      final updateResult = await collection.updateOne(
-        mongo.where.eq('_id', objectId),
-        modifier,
+      final result = await ApiService.updateHODLeaveRequestStatus(
+        id: id,
+        status: finalDecision,
+        remarks: reason,
       );
 
-      await db.close();
-
-      if (updateResult.isSuccess) {
-        // Send notification to student via backend
-        // Send notification to student via backend with retry
-        _sendNotificationWithRetry(
-          studentEmail: studentEmail,
-          studentName: studentName,
-          requestType: 'Leave',
-          status: hodStatusValue,
-          requestId: id,
-        );
-
+      if (result['success'] == true) {
+        if (kDebugMode) {
+          print("DEBUG: Status updated successfully via API");
+        }
         await fetchRequests();
-        _showSnackBar(
-          'Leave request $finalDecision successfully',
-          Colors.green,
-        );
+        if (mounted) {
+          _showSnackBar(
+            'Leave request $finalDecision successfully',
+            Colors.green,
+          );
+        }
       } else {
-        _showSnackBar('Failed to update leave request', Colors.red);
+        if (mounted) {
+          _showSnackBar(
+            'Failed to update status: ${result['message']}',
+            Colors.red,
+          );
+        }
       }
     } catch (e) {
-      _showSnackBar('Error updating leave request: $e', Colors.red);
+      if (mounted) {
+        _showSnackBar('An error occurred: $e', Colors.red);
+      }
     }
   }
 
@@ -1111,7 +1082,7 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
     bool isLoading = false,
     ValueChanged<bool>? onLoadingChanged,
   }) {
-    final requestId = request['_id']?.toHexString() ?? '';
+    final requestId = request['_id']?.toString() ?? '';
 
     if (status.toLowerCase() == 'pending' ||
         status.toLowerCase() == 'pending_hod') {
@@ -1374,94 +1345,6 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
       return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
     } catch (e) {
       return dateTimeValue.toString();
-    }
-  }
-
-  Future<void> _sendNotificationWithRetry({
-    required String studentEmail,
-    required String studentName,
-    required String requestType,
-    required String status,
-    required String requestId,
-  }) async {
-    const int maxRetries = 3;
-    const Duration initialDelay = Duration(seconds: 2);
-
-    // Construct notification content
-    final statusText = status.toLowerCase();
-    String title;
-    String body;
-
-    if (statusText == 'approved' || statusText == 'accepted') {
-      title = '$requestType Request Approved';
-      body =
-          'Hi $studentName, your ${requestType.toLowerCase()} request has been approved by HOD.';
-    } else if (statusText == 'rejected') {
-      title = '$requestType Request Rejected';
-      body =
-          'Hi $studentName, your ${requestType.toLowerCase()} request has been rejected by HOD.';
-    } else {
-      title = '$requestType Request Update';
-      body =
-          'Hi $studentName, your ${requestType.toLowerCase()} request status has been updated to $status.';
-    }
-
-    for (int i = 0; i < maxRetries; i++) {
-      try {
-        if (kDebugMode) {
-          print(
-            'DEBUG: Sending notification for $requestType $requestId (Attempt ${i + 1}/$maxRetries)...',
-          );
-        }
-
-        final notifUrl = Uri.parse(
-          '${LocalConfig.apiBaseUrl}/notifications/send-notification',
-        );
-
-        final response = await http
-            .post(
-              notifUrl,
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({
-                'studentEmail': studentEmail,
-                'title': title,
-                'body': body,
-                'data': {
-                  'type': 'hod_decision',
-                  'requestType': requestType,
-                  'status': status,
-                  'requestId': requestId,
-                  'approverRole': 'hod',
-                },
-              }),
-            )
-            .timeout(const Duration(seconds: 30));
-
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          if (kDebugMode) {
-            print(
-              'DEBUG: Notification sent successfully for $requestType request $requestId',
-            );
-          }
-          return;
-        } else {
-          throw Exception(
-            'Server returned ${response.statusCode}: ${response.body}',
-          );
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print('DEBUG: Notification attempt ${i + 1} failed: $e');
-        }
-        if (i < maxRetries - 1) {
-          await Future.delayed(initialDelay * (i + 1)); // Linear backoff
-        }
-      }
-    }
-    if (kDebugMode) {
-      print(
-        'DEBUG: Failed to send notification for $requestId after $maxRetries attempts.',
-      );
     }
   }
 }
