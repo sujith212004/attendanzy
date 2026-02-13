@@ -1,7 +1,3 @@
-/// Local Configuration - DO NOT COMMIT TO GIT
-/// 
-/// This file contains sensitive credentials and should remain local only.
-
 class LocalConfig {
   // MongoDB Connection String
   static const String mongoUri = 

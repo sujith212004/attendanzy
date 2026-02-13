@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/widgets/mac_folder_fullpage.dart';
 import '../../../../core/services/api_service.dart';
+import '../../../../core/config/local_config.dart';
 
 class ODRequestsstaffPage extends StatefulWidget {
   const ODRequestsstaffPage({super.key});
@@ -152,6 +154,15 @@ class _ODRequestsstaffPageState extends State<ODRequestsstaffPage> {
           prefs.getString('incharge') ??
           ''; // e.g., "II-A"
 
+      // Get request details for notification (fetch locally from list)
+      final request = requests.firstWhere(
+        (r) => r['_id'] == id,
+        orElse: () => {},
+      );
+      final studentEmail = request['studentEmail'] ?? '';
+      final studentName =
+          request['studentName'] ?? request['name'] ?? 'Student';
+
       final result = await ApiService.updateODRequestStatus(
         id: id,
         status: status,
@@ -163,6 +174,16 @@ class _ODRequestsstaffPageState extends State<ODRequestsstaffPage> {
       );
 
       if (result['success']) {
+        // Send notification
+        _sendNotificationWithRetry(
+          studentEmail: studentEmail,
+          studentName: studentName,
+          requestType: 'OD',
+          status: status,
+          requestId: id,
+          approverRole: 'staff',
+        );
+
         await fetchRequests();
         _showSnackBar(
           'Request $status successfully',
@@ -181,6 +202,75 @@ class _ODRequestsstaffPageState extends State<ODRequestsstaffPage> {
         setState(() {
           _isUpdating = false; // Hide loader
         });
+      }
+    }
+  }
+
+  Future<void> _sendNotificationWithRetry({
+    required String studentEmail,
+    required String studentName,
+    required String requestType,
+    required String status,
+    required String requestId,
+    required String approverRole,
+  }) async {
+    const int maxRetries = 2;
+    const Duration initialDelay = Duration(seconds: 2);
+
+    // Construct notification content
+    final statusText = status.toLowerCase();
+    String title;
+    String body;
+
+    // Staff logic
+    if (statusText == 'approved' ||
+        statusText == 'accepted' ||
+        statusText == 'forwarded') {
+      title = '$requestType Request Forwarded';
+      body =
+          'Hi $studentName, your ${requestType.toLowerCase()} request has been forwarded to HOD for final approval.';
+    } else if (statusText == 'rejected') {
+      title = '$requestType Request Rejected';
+      body =
+          'Hi $studentName, your ${requestType.toLowerCase()} request has been rejected by Staff.';
+    } else {
+      title = '$requestType Request Update';
+      body =
+          'Hi $studentName, your ${requestType.toLowerCase()} request status has been updated by Staff.';
+    }
+
+    for (int i = 0; i < maxRetries; i++) {
+      try {
+        final notifUrl = Uri.parse(
+          '${LocalConfig.apiBaseUrl}/notifications/send-notification',
+        );
+
+        await http
+            .post(
+              notifUrl,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'studentEmail': studentEmail,
+                'title': title,
+                'body': body,
+                'data': {
+                  'type': 'status_update',
+                  'requestType': requestType,
+                  'status': status,
+                  'requestId': requestId,
+                  'approverRole': approverRole,
+                },
+              }),
+            )
+            .timeout(const Duration(seconds: 5));
+
+        if (kDebugMode) print('Notification request sent for $requestId');
+        return;
+      } catch (e) {
+        if (kDebugMode) print('Notification attempt ${i + 1} failed: $e');
+        if (i < maxRetries - 1) {
+          await Future.delayed(initialDelay);
+        }
       }
     }
   }

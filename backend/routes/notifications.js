@@ -114,7 +114,7 @@ router.post('/test', async (req, res) => {
 
 // HOD decision notification endpoint
 // Called by Flutter frontend after directly updating MongoDB status
-router.post('/hod-decision', async (req, res) => {
+router.post('/hod-decision', (req, res) => {
     try {
         const { studentEmail, studentName, requestType, status } = req.body;
 
@@ -125,50 +125,66 @@ router.post('/hod-decision', async (req, res) => {
             });
         }
 
-        console.log(`\n========== HOD DECISION NOTIFICATION ==========`);
-        console.log(`Student: ${studentName} (${studentEmail})`);
-        console.log(`Request Type: ${requestType}`);
-        console.log(`Status: ${status}`);
+        console.log(`\n========== HOD DECISION NOTIFICATION (QUEUED) ==========`);
+        console.log(`Student: ${studentName || 'Unknown'} (${studentEmail})`);
 
-        const { sendNotificationToUser } = require('../services/notificationService');
-
-        const statusText = status.toLowerCase();
-        let title, body;
-
-        if (statusText === 'approved' || statusText === 'accepted') {
-            title = `${requestType} Request Accepted`;
-            body = `Hi ${studentName || 'Student'}, your ${requestType.toLowerCase()} request has been accepted by HOD. You're good to go!`;
-        } else if (statusText === 'rejected') {
-            title = `${requestType} Request Rejected`;
-            body = `Hi ${studentName || 'Student'}, your ${requestType.toLowerCase()} request has been rejected by HOD. Please contact your department for more details.`;
-        } else {
-            title = `${requestType} Request Update`;
-            body = `Hi ${studentName || 'Student'}, your ${requestType.toLowerCase()} request status has been updated by HOD.`;
-        }
-
-        const result = await sendNotificationToUser(studentEmail, title, body, {
-            type: 'hod_decision',
-            requestType: requestType,
-            status: status,
-            approverRole: 'hod'
+        // Respond immediately to prevent frontend timeout
+        res.json({
+            success: true,
+            message: 'Notification queued for processing'
         });
 
-        console.log(`Notification result:`, result);
-        console.log(`========== HOD DECISION NOTIFICATION END ==========\n`);
+        // Background processing
+        (async () => {
+            try {
+                const { sendNotificationToUser } = require('../services/notificationService');
 
-        res.json(result);
+                const statusText = status.toLowerCase();
+                let title, body;
+
+                if (statusText === 'approved' || statusText === 'accepted') {
+                    title = `${requestType} Request Accepted`;
+                    body = `Hi ${studentName || 'Student'}, your ${requestType.toLowerCase()} request has been accepted by HOD. You're good to go!`;
+                } else if (statusText === 'rejected') {
+                    title = `${requestType} Request Rejected`;
+                    body = `Hi ${studentName || 'Student'}, your ${requestType.toLowerCase()} request has been rejected by HOD. Please contact your department for more details.`;
+                } else {
+                    title = `${requestType} Request Update`;
+                    body = `Hi ${studentName || 'Student'}, your ${requestType.toLowerCase()} request status has been updated by HOD.`;
+                }
+
+                console.log(`Processing background notification for ${studentEmail}...`);
+                const result = await sendNotificationToUser(studentEmail, title, body, {
+                    type: 'hod_decision',
+                    requestType: requestType,
+                    status: status,
+                    approverRole: 'hod'
+                });
+
+                console.log(`Background Notification result:`, result);
+                console.log(`========== HOD DECISION NOTIFICATION END ==========\n`);
+            } catch (err) {
+                console.error('Error in background HOD notification:', err);
+            }
+        })();
+
     } catch (error) {
-        console.error('Error sending HOD decision notification:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        console.error('Error queueing HOD decision notification:', error);
+        // Only send response if header not sent (though validation checks should cover it)
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
     }
 });
 
 // Generic send notification endpoint
 // Used by frontend for retry logic and custom notifications
-router.post('/send-notification', async (req, res) => {
+// Generic send notification endpoint
+// Used by frontend for retry logic and custom notifications
+router.post('/send-notification', (req, res) => {
     try {
         const { studentEmail, title, body, data } = req.body;
 
@@ -179,30 +195,44 @@ router.post('/send-notification', async (req, res) => {
             });
         }
 
-        console.log(`\n========== GENERIC NOTIFICATION ==========`);
-        console.log(`To: ${studentEmail}`);
-        console.log(`Title: ${title}`);
-
-        const { sendNotificationToUser } = require('../services/notificationService');
-
-        // Add type to data if not present
-        const notificationData = data || {};
-        if (!notificationData.type) {
-            notificationData.type = 'generic_notification';
-        }
-
-        const result = await sendNotificationToUser(studentEmail, title, body, notificationData);
-
-        console.log(`Result: ${result.success ? 'Success' : 'Failed'}`);
-        console.log(`========== GENERIC NOTIFICATION END ==========\n`);
-
-        res.json(result);
-    } catch (error) {
-        console.error('Error sending generic notification:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
+        // Respond immediately
+        res.json({
+            success: true,
+            message: 'Notification queued for processing'
         });
+
+        console.log(`\n========== GENERIC NOTIFICATION (QUEUED) ==========`);
+        console.log(`To: ${studentEmail}`);
+
+        // Background processing
+        (async () => {
+            try {
+                const { sendNotificationToUser } = require('../services/notificationService');
+
+                // Add type to data if not present
+                const notificationData = data || {};
+                if (!notificationData.type) {
+                    notificationData.type = 'generic_notification';
+                }
+
+                console.log(`Processing background notification for ${studentEmail}...`);
+                const result = await sendNotificationToUser(studentEmail, title, body, notificationData);
+
+                console.log(`Background Result: ${result.success ? 'Success' : 'Failed'}`);
+                console.log(`========== GENERIC NOTIFICATION END ==========\n`);
+            } catch (err) {
+                console.error('Error in background generic notification:', err);
+            }
+        })();
+
+    } catch (error) {
+        console.error('Error queueing generic notification:', error);
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
     }
 });
 
