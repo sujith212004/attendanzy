@@ -198,6 +198,10 @@ exports.updateStaffStatus = async (req, res) => {
         odRequest.staffStatus = dbStatus;
         odRequest.updatedAt = new Date().toISOString();
 
+        // Save staff details for history/display
+        if (staffName) odRequest.staffName = staffName;
+        if (inchargeName) odRequest.forwardedByIncharge = inchargeName;
+
         if (dbStatus === 'rejected') {
             odRequest.status = 'rejected';
             odRequest.rejectedBy = 'staff';
