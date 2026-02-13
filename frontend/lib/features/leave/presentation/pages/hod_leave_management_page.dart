@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mongo_dart/mongo_dart.dart' as mongo;
@@ -108,16 +109,29 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
 
       final objectId = mongo.ObjectId.fromHexString(id);
 
+      // Map finalDecision for hodStatus: keep as 'approved'/'rejected'
+      final hodStatusValue =
+          finalDecision.toLowerCase() == 'accepted'
+              ? 'approved'
+              : finalDecision.toLowerCase();
+
       var modifier = mongo.modify
           .set('status', finalDecision)
+          .set('hodStatus', hodStatusValue)
           .set('updatedAt', DateTime.now());
 
       if (finalDecision.toLowerCase() == 'rejected') {
         modifier = modifier
             .set('rejectedBy', 'hod')
             .set('rejectionReason', reason ?? '')
-            .set('status', 'rejected');
+            .set('status', 'rejected')
+            .set('hodStatus', 'rejected');
       }
+
+      // Get the request details before updating (for notification)
+      final request = await collection.findOne(mongo.where.eq('_id', objectId));
+      final studentEmail = request?['studentEmail'] ?? '';
+      final studentName = request?['studentName'] ?? 'Student';
 
       final updateResult = await collection.updateOne(
         mongo.where.eq('_id', objectId),
@@ -127,6 +141,32 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
       await db.close();
 
       if (updateResult.isSuccess) {
+        // Send notification to student via backend
+        try {
+          final notifUrl = Uri.parse(
+            '${LocalConfig.apiBaseUrl}/notifications/hod-decision',
+          );
+          await http.post(
+            notifUrl,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'studentEmail': studentEmail,
+              'studentName': studentName,
+              'requestType': 'Leave',
+              'status': hodStatusValue,
+            }),
+          );
+          if (kDebugMode) {
+            print(
+              'DEBUG: HOD decision notification sent for Leave request $id',
+            );
+          }
+        } catch (notifErr) {
+          if (kDebugMode) {
+            print('DEBUG: Failed to send notification: $notifErr');
+          }
+        }
+
         await fetchRequests();
         _showSnackBar(
           'Leave request $finalDecision successfully',

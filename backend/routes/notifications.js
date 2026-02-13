@@ -11,17 +11,17 @@ router.post('/update-token', async (req, res) => {
         const { email, fcmToken } = req.body;
 
         if (!email || !fcmToken) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Email and FCM token are required' 
+            return res.status(400).json({
+                success: false,
+                message: 'Email and FCM token are required'
             });
         }
 
         // Update token in database - check all collections
         const emailLower = email.toLowerCase();
-        const updateData = { 
-            fcmToken: fcmToken, 
-            fcmTokenUpdatedAt: new Date() 
+        const updateData = {
+            fcmToken: fcmToken,
+            fcmTokenUpdatedAt: new Date()
         };
 
         console.log(`Attempting to update FCM token for: ${emailLower}`);
@@ -37,12 +37,14 @@ router.post('/update-token', async (req, res) => {
         // If not found in User, try Staff collection
         if (!result) {
             result = await Staff.findOneAndUpdate(
-                { $or: [
-                    { email: emailLower }, 
-                    { 'College Email': emailLower },
-                    { email: new RegExp(`^${emailLower}$`, 'i') },
-                    { 'College Email': new RegExp(`^${emailLower}$`, 'i') }
-                ]},
+                {
+                    $or: [
+                        { email: emailLower },
+                        { 'College Email': emailLower },
+                        { email: new RegExp(`^${emailLower}$`, 'i') },
+                        { 'College Email': new RegExp(`^${emailLower}$`, 'i') }
+                    ]
+                },
                 { $set: updateData },
                 { new: true }
             );
@@ -52,12 +54,14 @@ router.post('/update-token', async (req, res) => {
         // If not found in Staff, try HOD collection
         if (!result) {
             result = await HOD.findOneAndUpdate(
-                { $or: [
-                    { email: emailLower }, 
-                    { 'College Email': emailLower },
-                    { email: new RegExp(`^${emailLower}$`, 'i') },
-                    { 'College Email': new RegExp(`^${emailLower}$`, 'i') }
-                ]},
+                {
+                    $or: [
+                        { email: emailLower },
+                        { 'College Email': emailLower },
+                        { email: new RegExp(`^${emailLower}$`, 'i') },
+                        { 'College Email': new RegExp(`^${emailLower}$`, 'i') }
+                    ]
+                },
                 { $set: updateData },
                 { new: true }
             );
@@ -66,22 +70,22 @@ router.post('/update-token', async (req, res) => {
 
         if (result) {
             console.log(`FCM token updated for ${email}`);
-            res.json({ 
-                success: true, 
-                message: 'FCM token updated successfully' 
+            res.json({
+                success: true,
+                message: 'FCM token updated successfully'
             });
         } else {
-            res.status(404).json({ 
-                success: false, 
-                message: 'User not found in any collection' 
+            res.status(404).json({
+                success: false,
+                message: 'User not found in any collection'
             });
         }
     } catch (error) {
         console.error('Error updating FCM token:', error);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             message: 'Server error',
-            error: error.message 
+            error: error.message
         });
     }
 });
@@ -91,19 +95,73 @@ router.post('/test', async (req, res) => {
     try {
         const { email, title, body } = req.body;
         const { sendNotificationToUser } = require('../services/notificationService');
-        
+
         const result = await sendNotificationToUser(
-            email, 
-            title || 'Test Notification', 
+            email,
+            title || 'Test Notification',
             body || 'This is a test notification from Attendanzy'
         );
 
         res.json(result);
     } catch (error) {
         console.error('Error sending test notification:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: error.message 
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// HOD decision notification endpoint
+// Called by Flutter frontend after directly updating MongoDB status
+router.post('/hod-decision', async (req, res) => {
+    try {
+        const { studentEmail, studentName, requestType, status } = req.body;
+
+        if (!studentEmail || !requestType || !status) {
+            return res.status(400).json({
+                success: false,
+                message: 'studentEmail, requestType, and status are required'
+            });
+        }
+
+        console.log(`\n========== HOD DECISION NOTIFICATION ==========`);
+        console.log(`Student: ${studentName} (${studentEmail})`);
+        console.log(`Request Type: ${requestType}`);
+        console.log(`Status: ${status}`);
+
+        const { sendNotificationToUser } = require('../services/notificationService');
+
+        const statusText = status.toLowerCase();
+        let title, body;
+
+        if (statusText === 'approved' || statusText === 'accepted') {
+            title = `${requestType} Request Accepted`;
+            body = `Hi ${studentName || 'Student'}, your ${requestType.toLowerCase()} request has been accepted by HOD. You're good to go!`;
+        } else if (statusText === 'rejected') {
+            title = `${requestType} Request Rejected`;
+            body = `Hi ${studentName || 'Student'}, your ${requestType.toLowerCase()} request has been rejected by HOD. Please contact your department for more details.`;
+        } else {
+            title = `${requestType} Request Update`;
+            body = `Hi ${studentName || 'Student'}, your ${requestType.toLowerCase()} request status has been updated by HOD.`;
+        }
+
+        const result = await sendNotificationToUser(studentEmail, title, body, {
+            type: 'hod_decision',
+            requestType: requestType,
+            status: status,
+            approverRole: 'hod'
+        });
+
+        console.log(`Notification result:`, result);
+        console.log(`========== HOD DECISION NOTIFICATION END ==========\n`);
+
+        res.json(result);
+    } catch (error) {
+        console.error('Error sending HOD decision notification:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });

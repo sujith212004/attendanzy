@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mongo_dart/mongo_dart.dart' as mongo;
@@ -100,22 +101,62 @@ class _HodOdManagementPageState extends State<HodOdManagementPage> {
       await db.open();
       final collection = db.collection(collectionName);
 
+      // Map status for hodStatus field: 'accepted' -> 'approved'
+      final hodStatusValue =
+          status.toLowerCase() == 'accepted'
+              ? 'approved'
+              : status.toLowerCase();
+
       var modifier = mongo.modify
           .set('status', status)
+          .set('hodStatus', hodStatusValue)
           .set('updatedAt', DateTime.now());
 
       if (status.toLowerCase() == 'rejected') {
         modifier = modifier
             .set('rejectedBy', 'hod')
             .set('rejectionReason', reason ?? '')
-            .set('status', 'rejected');
+            .set('status', 'rejected')
+            .set('hodStatus', 'rejected');
       }
+
+      // Get the request details before updating (for notification)
+      final request = await collection.findOne(
+        mongo.where.id(mongo.ObjectId.parse(id)),
+      );
+      final studentEmail = request?['studentEmail'] ?? '';
+      final studentName = request?['studentName'] ?? 'Student';
 
       await collection.updateOne(
         mongo.where.id(mongo.ObjectId.parse(id)),
         modifier,
       );
       await db.close();
+
+      // Send notification to student via backend
+      try {
+        final notifUrl = Uri.parse(
+          '${LocalConfig.apiBaseUrl}/notifications/hod-decision',
+        );
+        await http.post(
+          notifUrl,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'studentEmail': studentEmail,
+            'studentName': studentName,
+            'requestType': 'OD',
+            'status': hodStatusValue,
+          }),
+        );
+        if (kDebugMode) {
+          print('DEBUG: HOD decision notification sent for OD request $id');
+        }
+      } catch (notifErr) {
+        if (kDebugMode) {
+          print('DEBUG: Failed to send notification: $notifErr');
+        }
+      }
+
       await fetchRequests();
 
       if (mounted) {
