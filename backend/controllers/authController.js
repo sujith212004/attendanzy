@@ -19,16 +19,21 @@ const getModelByRole = (role) => {
 
 // Send Email
 const sendEmail = async (options) => {
-    // Fail-Safe Configuration: Port 465 (SSL) is often less throttled than 587
+    // Generic SMTP Configuration (Industrial Standard)
+    // Supports Gmail, Brevo, SendGrid, Outlook based on ENV vars
     const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: process.env.SMTP_SECURE === 'true', // true for 465, false for 587
         auth: {
-            user: process.env.SMTP_EMAIL,
+            user: process.env.SMTP_EMAIL || process.env.SMTP_USER, // Support both naming conventions
             pass: process.env.SMTP_PASSWORD,
         },
-        family: 4, // Force IPv4
+        tls: {
+            rejectUnauthorized: false // Helps with some shared hosting SSL issues
+        },
+        // Remove 'family: 4' as it might conflict with some providers, 
+        // rely on the provider's DNS resolution.
         logger: true,
         debug: true,
         connectionTimeout: 60000,
