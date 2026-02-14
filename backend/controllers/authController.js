@@ -26,8 +26,8 @@ const sendEmail = async (options) => {
     // Using explicit settings to avoid timeouts on some environments (like Render)
     const transporter = nodemailer.createTransport({
         host: 'smtp.gmail.com',
-        port: 587,
-        secure: false, // use false for STARTTLS; true for 465
+        port: 465,
+        secure: true, // use true for Port 465 (SMTPS)
         auth: {
             user: process.env.SMTP_EMAIL,
             pass: process.env.SMTP_PASSWORD,
