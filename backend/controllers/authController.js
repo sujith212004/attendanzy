@@ -21,12 +21,21 @@ const getModelByRole = (role) => {
 const sendEmail = async (options) => {
     // Create transporter
     // For production, use environment variables for credentials
+    // Create transporter
+    // For production, use environment variables for credentials
+    // Using explicit settings to avoid timeouts on some environments (like Render)
     const transporter = nodemailer.createTransport({
-        service: 'gmail', // or your SMTP service
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false, // use false for STARTTLS; true for 465
         auth: {
             user: process.env.SMTP_EMAIL,
             pass: process.env.SMTP_PASSWORD,
         },
+        // Add timeouts to fail faster if connection is blocked
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 10000,
     });
 
     const message = {

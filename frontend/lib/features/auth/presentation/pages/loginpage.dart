@@ -501,28 +501,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
         ),
         const SizedBox(height: 20),
         _buildEnhancedPasswordField(),
-        const SizedBox(height: 10),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ForgotPasswordPage(),
-                ),
-              );
-            },
-            child: const Text(
-              'Forgot Password?',
-              style: TextStyle(
-                color: Color(0xFF667eea),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 20),
         _buildEnhancedDropdown(
           value: _selectedRoleIndex,
           items: _roles,
@@ -544,9 +523,39 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
             HapticFeedback.selectionClick();
           },
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         _buildEnhancedErrorMessage(),
-        const SizedBox(height: 32),
+
+        // Forgot Password Link - Moved here as requested
+        Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 20),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ForgotPasswordPage(),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: const Text(
+                  'Forgot Password?',
+                  style: TextStyle(
+                    color: Color(0xFF667eea),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 10), // Reduced space since link is here
         _buildEnhancedLoginButton(),
         const SizedBox(height: 24),
         _buildFooterText(),
