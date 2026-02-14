@@ -26,8 +26,8 @@ const sendEmail = async (options) => {
         port: parseInt(process.env.SMTP_PORT || '587'),
         secure: process.env.SMTP_SECURE === 'true', // true for 465, false for 587
         auth: {
-            user: process.env.SMTP_EMAIL || process.env.SMTP_USER, // Support both naming conventions
-            pass: process.env.SMTP_PASSWORD,
+            user: (process.env.SMTP_EMAIL || process.env.SMTP_USER || '').trim(), // Support both naming conventions
+            pass: (process.env.SMTP_PASSWORD || '').trim(),
         },
         tls: {
             rejectUnauthorized: false // Helps with some shared hosting SSL issues
