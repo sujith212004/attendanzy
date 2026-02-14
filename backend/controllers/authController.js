@@ -24,22 +24,22 @@ const sendEmail = async (options) => {
     // Create transporter
     // For production, use environment variables for credentials
     // Using explicit settings to avoid timeouts on some environments (like Render)
-    // Using explicit settings with IPv4 forced to resolve Render timeout issues
+    // Using standard Port 587 with increased timeouts to handle network latency
     const transporter = nodemailer.createTransport({
         host: 'smtp.gmail.com',
-        port: 465,
-        secure: true, // true for 465, false for other ports
+        port: 587,
+        secure: false, // false for Port 587 (STARTTLS)
         auth: {
             user: process.env.SMTP_EMAIL,
             pass: process.env.SMTP_PASSWORD,
         },
-        // Force IPv4 as some cloud providers have issues with IPv6 routing to Gmail
-        family: 4,
+        family: 4, // Force IPv4
         logger: true,
         debug: true,
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
-        socketTimeout: 10000,
+        // Increase timeouts to 60 seconds (10s was too short for cloud environments)
+        connectionTimeout: 60000,
+        greetingTimeout: 60000,
+        socketTimeout: 60000,
     });
 
     const message = {
