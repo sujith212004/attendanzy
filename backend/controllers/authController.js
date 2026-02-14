@@ -24,17 +24,25 @@ const sendEmail = async (options) => {
     // Create transporter
     // For production, use environment variables for credentials
     // Using explicit settings to avoid timeouts on some environments (like Render)
-    // Switching to smtp.googlemail.com which sometimes resolves differently
+    // Final Attempt: Standard Port 587 with IPv4 and loose TLS
+    // If this fails, the issue is likely Render blocking Gmail SMTP strictly.
     const transporter = nodemailer.createTransport({
-        host: 'smtp.googlemail.com',
-        port: 465,
-        secure: true,
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
         auth: {
             user: process.env.SMTP_EMAIL,
             pass: process.env.SMTP_PASSWORD,
         },
+        family: 4, // Force IPv4
+        tls: {
+            rejectUnauthorized: false // Fix for some cloud SSL issues
+        },
         logger: true,
         debug: true,
+        connectionTimeout: 30000,
+        greetingTimeout: 30000,
+        socketTimeout: 30000,
     });
 
     const message = {
@@ -218,6 +226,12 @@ exports.forgotPassword = async (req, res) => {
             res.status(200).json({ success: true, message: 'Email sent successfully' });
         } catch (err) {
             console.error('Email send error:', err);
+
+            // FALLBACK FOR DEBUGGING: Log OTP so you can still test the Reset Password flow
+            console.log('==========================================');
+            console.log(' [DEBUG] EMAIL FAILED. MANUAL OTP: ', otp);
+            console.log('==========================================');
+
             user.resetPasswordToken = undefined;
             user.resetPasswordExpire = undefined;
             await user.save();
