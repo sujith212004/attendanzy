@@ -41,6 +41,18 @@ const sendEmail = async (options) => {
         socketTimeout: 60000,
     });
 
+    // --- CREDENTIAL DEBUGGING (REMOVE LATER) ---
+    const debugPass = (process.env.SMTP_PASSWORD || '').trim();
+    console.log('--- SMTP DEBUG ---');
+    console.log('User:', (process.env.SMTP_EMAIL || process.env.SMTP_USER || '').trim());
+    console.log('Pass Length:', debugPass.length);
+    console.log('Pass Start:', debugPass.substring(0, 5));
+    console.log('Pass End:', debugPass.substring(debugPass.length - 5));
+    console.log('Contains Space?:', debugPass.includes(' '));
+    console.log('Contains Newline?:', debugPass.includes('\n'));
+    console.log('------------------');
+    // -------------------------------------------
+
     const message = {
         from: `${process.env.FROM_NAME || 'Attendanzy'} <${process.env.FROM_EMAIL || process.env.SMTP_EMAIL}>`,
         to: options.email,
