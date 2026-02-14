@@ -34,6 +34,12 @@ const hodSchema = new mongoose.Schema({
         type: Date,
         default: null,
     },
+    passwordHash: {
+        type: String,
+        select: false,
+    },
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
 }, {
     collection: 'HOD', // Use existing collection name
     timestamps: false,

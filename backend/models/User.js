@@ -44,6 +44,12 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: Date.now,
     },
+    passwordHash: {
+        type: String,
+        select: false, // Don't return by default
+    },
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
 }, {
     collection: 'profile', // Use existing collection name
     timestamps: false,

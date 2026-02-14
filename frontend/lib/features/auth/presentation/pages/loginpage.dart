@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../home/presentation/pages/homepage.dart';
 import '../../../../core/services/api_service.dart';
 import '../../../../core/services/firebase_api.dart';
+import 'forgot_password_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -500,7 +501,28 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
         ),
         const SizedBox(height: 20),
         _buildEnhancedPasswordField(),
-        const SizedBox(height: 20),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ForgotPasswordPage(),
+                ),
+              );
+            },
+            child: const Text(
+              'Forgot Password?',
+              style: TextStyle(
+                color: Color(0xFF667eea),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
         _buildEnhancedDropdown(
           value: _selectedRoleIndex,
           items: _roles,

@@ -1,6 +1,46 @@
 const User = require('../models/User');
 const Staff = require('../models/Staff');
 const HOD = require('../models/HOD');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
+
+// --- Helper Functions ---
+
+// Get Model based on Role
+const getModelByRole = (role) => {
+    switch (role.toLowerCase()) {
+        case 'user': return User;
+        case 'staff': return Staff;
+        case 'hod': return HOD;
+        default: return null;
+    }
+};
+
+// Send Email
+const sendEmail = async (options) => {
+    // Create transporter
+    // For production, use environment variables for credentials
+    const transporter = nodemailer.createTransport({
+        service: 'gmail', // or your SMTP service
+        auth: {
+            user: process.env.SMTP_EMAIL,
+            pass: process.env.SMTP_PASSWORD,
+        },
+    });
+
+    const message = {
+        from: `${process.env.FROM_NAME || 'Attendanzy'} <${process.env.FROM_EMAIL || process.env.SMTP_EMAIL}>`,
+        to: options.email,
+        subject: options.subject,
+        text: options.message,
+        // html: options.html // Optional: Add HTML template
+    };
+
+    await transporter.sendMail(message);
+};
+
+// --- Controllers ---
 
 // Login controller
 exports.login = async (req, res) => {
@@ -8,52 +48,82 @@ exports.login = async (req, res) => {
         const { email, password, role, department } = req.body;
 
         // Validate input
-        if (!email || !password || !role || !department) {
+        if (!email || !password || !role) {
             return res.status(400).json({
                 success: false,
-                message: 'Please provide email, password, role, and department',
+                message: 'Please provide email, password, and role',
             });
         }
 
-        // Determine which collection to query based on role
-        let Model;
-        let collectionName;
-
-        if (role.toLowerCase() === 'user') {
-            Model = User;
-            collectionName = 'profile';
-        } else if (role.toLowerCase() === 'staff') {
-            Model = Staff;
-            collectionName = 'Staff';
-        } else if (role.toLowerCase() === 'hod') {
-            Model = HOD;
-            collectionName = 'HOD';
-        } else {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid role',
-            });
+        // Get Model
+        const Model = getModelByRole(role);
+        if (!Model) {
+            return res.status(400).json({ success: false, message: 'Invalid role' });
         }
 
-        // Find user with case-insensitive email match
+        // Find user
+        // Select passwordHash explicitly if it exists
         const user = await Model.findOne({
             $or: [
                 { email: new RegExp(`^${email}$`, 'i') },
                 { 'College Email': new RegExp(`^${email}$`, 'i') }
             ],
-            password: password,
-            role: role.toLowerCase(),
-            department: department,
-        });
+            // Only check department if provided and required (e.g. for User/Staff login logic usually)
+            // But let's keep it flexible. If department is passed, we can validation it after finding user, 
+            // or include it in query if strict. 
+            // The original code used department in query. Let's keep it if department is critical for uniqueness?
+            // Actually, email should be unique across a role.
+            // Let's Find by Email first.
+        }).select('+passwordHash');
 
         if (!user) {
             return res.status(401).json({
                 success: false,
-                message: 'Invalid credentials. Please check your email, password, role, and department.',
+                message: 'Invalid credentials',
             });
         }
 
-        // Prepare user data for response
+        // Check Department if provided (Strict check from legacy code)
+        if (department && user.department !== department) {
+            return res.status(401).json({
+                success: false,
+                message: 'Department mismatch or invalid credentials',
+            });
+        }
+
+        // --- Dual Password Check Strategy ---
+        let isMatch = false;
+
+        // 1. Check bcrypted hash first (New Secure Way)
+        if (user.passwordHash) {
+            isMatch = await bcrypt.compare(password, user.passwordHash);
+        }
+
+        // 2. If Hash didn't match (or didn't exist), check Plain Text (Legacy Way)
+        if (!isMatch) {
+            if (user.password === password) {
+                isMatch = true;
+
+                // MIGRATION: Secure the account by hashing the plain text password now
+                try {
+                    const salt = await bcrypt.genSalt(10);
+                    user.passwordHash = await bcrypt.hash(password, salt);
+                    await user.save();
+                    console.log(`[Migration] User ${user.email} migrated to secure password.`);
+                } catch (err) {
+                    console.warn('[Migration] Failed to save hash:', err.message);
+                }
+            }
+        }
+
+        if (!isMatch) {
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid credentials',
+            });
+        }
+
+        // Prepare response data
         const userData = {
             email: user.email || user['College Email'] || '',
             name: user.name || user.Name || '',
@@ -62,7 +132,6 @@ exports.login = async (req, res) => {
             isStaff: role.toLowerCase() === 'staff' || role.toLowerCase() === 'hod',
         };
 
-        // Add year and section for users and staff
         if (role.toLowerCase() === 'user') {
             userData.year = user.year || '';
             userData.sec = user.sec || '';
@@ -75,7 +144,6 @@ exports.login = async (req, res) => {
             userData.inchargeName = user.inchargeName || user.incharge || '';
         }
 
-        // Return success response
         res.status(200).json({
             success: true,
             message: 'Login successful',
@@ -87,75 +155,121 @@ exports.login = async (req, res) => {
         console.error('Login error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to connect to the database',
+            message: 'Server Error during login',
             error: error.message,
         });
     }
 };
 
-// Change password controller
-exports.changePassword = async (req, res) => {
+// Forgot Password
+exports.forgotPassword = async (req, res) => {
     try {
-        const { email, oldPassword, newPassword, role } = req.body;
+        const { email, role } = req.body;
 
-        if (!email || !oldPassword || !newPassword || !role) {
-            return res.status(400).json({
-                success: false,
-                message: 'Please provide all required fields',
-            });
+        const Model = getModelByRole(role);
+        if (!Model) {
+            return res.status(400).json({ success: false, message: 'Invalid role' });
         }
 
-        // Determine which model to use
-        let Model;
-        if (role.toLowerCase() === 'user') {
-            Model = User;
-        } else if (role.toLowerCase() === 'staff') {
-            Model = Staff;
-        } else if (role.toLowerCase() === 'hod') {
-            Model = HOD;
-        } else {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid role',
-            });
-        }
-
-        // Find user and verify old password
         const user = await Model.findOne({
             $or: [
                 { email: new RegExp(`^${email}$`, 'i') },
                 { 'College Email': new RegExp(`^${email}$`, 'i') }
             ],
-            password: oldPassword,
         });
 
         if (!user) {
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid old password',
-            });
+            return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        // Update password
-        user.password = newPassword;
+        // Generate OTP
+        // Ensure OTP is a string
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // Hash OTP (optional, but good practice. For simplicity with legacy, we might just store it. 
+        // But let's try to be secure. Actually, let's store plain OTP for now to ensure simple matching, 
+        // implementing "resetPasswordToken" as the OTP)
+        // Ideally we hash the token. Let's start simple: Store the OTP directly.
+
+        user.resetPasswordToken = otp; // In production, hash this!
+        user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 Minutes
+
         await user.save();
 
-        res.status(200).json({
-            success: true,
-            message: 'Password changed successfully',
-        });
+        const message = `You are receiving this email because you (or someone else) has requested the reset of a password. \n\n` +
+            `Your OTP is: ${otp}\n\n` +
+            `This OTP is valid for 10 minutes.`;
+
+        try {
+            await sendEmail({
+                email: user.email || user['College Email'],
+                subject: 'Attendanzy Password Reset OTP',
+                message,
+            });
+
+            res.status(200).json({ success: true, message: 'Email sent successfully' });
+        } catch (err) {
+            console.error('Email send error:', err);
+            user.resetPasswordToken = undefined;
+            user.resetPasswordExpire = undefined;
+            await user.save();
+            return res.status(500).json({ success: false, message: 'Email could not be sent' });
+        }
 
     } catch (error) {
-        console.error('Change password error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to change password',
-            error: error.message,
-        });
+        console.error('Forgot Password Error:', error);
+        res.status(500).json({ success: false, message: 'Server Error' });
     }
 };
 
-// Get user profile
+// Reset Password
+exports.resetPassword = async (req, res) => {
+    try {
+        const { email, role, otp, newPassword } = req.body;
+
+        if (!email || !role || !otp || !newPassword) {
+            return res.status(400).json({ success: false, message: 'Please provide all fields' });
+        }
+
+        const Model = getModelByRole(role);
+        if (!Model) return res.status(400).json({ success: false, message: 'Invalid role' });
+
+        const user = await Model.findOne({
+            $or: [
+                { email: new RegExp(`^${email}$`, 'i') },
+                { 'College Email': new RegExp(`^${email}$`, 'i') }
+            ],
+            resetPasswordToken: otp,
+            resetPasswordExpire: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+        }
+
+        // Set new password
+        // 1. Set Password Hash
+        const salt = await bcrypt.genSalt(10);
+        user.passwordHash = await bcrypt.hash(newPassword, salt);
+
+        // 2. Sync Plain Text Password (Legacy Compatibility)
+        user.password = newPassword;
+
+        // Clear tokens
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpire = undefined;
+
+        await user.save();
+
+        res.status(200).json({ success: true, message: 'Password updated successfully' });
+
+    } catch (error) {
+        console.error('Reset Password Error:', error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+// Get user profile (Unchanged mostly, just ensure it works with new fields present but not selected)
 exports.getProfile = async (req, res) => {
     try {
         const { email, role } = req.query;
@@ -167,19 +281,8 @@ exports.getProfile = async (req, res) => {
             });
         }
 
-        let Model;
-        if (role.toLowerCase() === 'user') {
-            Model = User;
-        } else if (role.toLowerCase() === 'staff') {
-            Model = Staff;
-        } else if (role.toLowerCase() === 'hod') {
-            Model = HOD;
-        } else {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid role',
-            });
-        }
+        const Model = getModelByRole(role);
+        if (!Model) return res.status(400).json({ success: false, message: 'Invalid role' });
 
         const user = await Model.findOne({
             $or: [

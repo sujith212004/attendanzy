@@ -42,6 +42,51 @@ class ApiService {
     }
   }
 
+  /// Forgot Password - Send OTP
+  static Future<Map<String, dynamic>> forgotPassword({
+    required String email,
+    required String role,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/forgot-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'role': role}),
+      );
+
+      final data = jsonDecode(response.body);
+      return data;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to connect to server: $e'};
+    }
+  }
+
+  /// Reset Password - Verify OTP and Set New Password
+  static Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String role,
+    required String otp,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/reset-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'role': role,
+          'otp': otp,
+          'newPassword': newPassword,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+      return data;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to connect to server: $e'};
+    }
+  }
+
   /// Submit OD Request
   static Future<Map<String, dynamic>> submitODRequest({
     required String studentName,
