@@ -41,16 +41,6 @@ const sendEmail = async (options) => {
         socketTimeout: 60000,
     });
 
-    // --- CREDENTIAL DEBUGGING (REMOVE LATER) ---
-    const debugPass = (process.env.SMTP_PASSWORD || '').trim();
-    console.log('--- SMTP DEBUG ---');
-    console.log('User:', (process.env.SMTP_EMAIL || process.env.SMTP_USER || '').trim());
-    console.log('Pass Length:', debugPass.length);
-    console.log('Pass Start:', debugPass.substring(0, 5));
-    console.log('Pass End:', debugPass.substring(debugPass.length - 5));
-    console.log('Contains Space?:', debugPass.includes(' '));
-    console.log('Contains Newline?:', debugPass.includes('\n'));
-    console.log('------------------');
     // -------------------------------------------
 
     const message = {
@@ -58,6 +48,7 @@ const sendEmail = async (options) => {
         to: options.email,
         subject: options.subject,
         text: options.message,
+        html: options.html, // Add HTML support
     };
 
     await transporter.sendMail(message);
@@ -206,15 +197,40 @@ exports.forgotPassword = async (req, res) => {
 
         await user.save();
 
-        const message = `You are receiving this email because you (or someone else) has requested the reset of a password. \n\n` +
+        const messageText = `You represent receiving this email because you (or someone else) has requested the reset of a password. \n\n` +
             `Your OTP is: ${otp}\n\n` +
             `This OTP is valid for 10 minutes.`;
+
+        const messageHtml = `
+            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
+                <div style="background-color: #4A90E2; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Attendanzy</h1>
+                </div>
+                <div style="padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px; background-color: #ffffff;">
+                    <h2 style="color: #4A90E2; margin-top: 0;">Password Reset Request</h2>
+                    <p>Hello,</p>
+                    <p>We received a request to reset your password for your Attendanzy account.</p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <span style="display: inline-block; padding: 15px 30px; font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #4A90E2; background-color: #f0f7ff; border-radius: 8px; border: 2px dashed #4A90E2;">
+                            ${otp}
+                        </span>
+                    </div>
+                    <p>This code is valid for <strong>10 minutes</strong>. Do not share this code with anyone.</p>
+                    <p>If you didn't request a password reset, you can safely ignore this email.</p>
+                    <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
+                    <p style="font-size: 12px; color: #888; text-align: center;">
+                        &copy; ${new Date().getFullYear()} Attendanzy. All rights reserved.
+                    </p>
+                </div>
+            </div>
+        `;
 
         try {
             await sendEmail({
                 email: user.email || user['College Email'],
-                subject: 'Attendanzy Password Reset OTP',
-                message,
+                subject: 'Attendanzy Password Reset Code', // Updated Subject
+                message: messageText,
+                html: messageHtml, // New HTML Content
             });
 
             res.status(200).json({ success: true, message: 'Email sent successfully' });
