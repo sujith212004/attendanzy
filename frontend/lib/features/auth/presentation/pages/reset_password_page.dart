@@ -13,57 +13,27 @@ class ResetPasswordPage extends StatefulWidget {
   _ResetPasswordPageState createState() => _ResetPasswordPageState();
 }
 
-class _ResetPasswordPageState extends State<ResetPasswordPage>
-    with TickerProviderStateMixin {
+class _ResetPasswordPageState extends State<ResetPasswordPage> {
   final TextEditingController _otpController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
 
   bool _isLoading = false;
   String _errorMessage = '';
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
 
-  late AnimationController _entryController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _entryController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _entryController, curve: Curves.easeOut),
-    );
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.1),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _entryController, curve: Curves.elasticOut),
-    );
-
-    _entryController.forward();
-  }
-
-  @override
-  void dispose() {
-    _entryController.dispose();
-    _otpController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
-    super.dispose();
-  }
+  // Colors - Professional Slate & Indigo Palette
+  static const Color primaryBlue = Color(0xFF4F46E5);
+  static const Color surfaceColor = Color(0xFFFFFFFF);
+  static const Color backgroundColor = Color(0xFFF8FAFC);
+  static const Color textDark = Color(0xFF0F172A);
+  static const Color textMuted = Color(0xFF64748B);
 
   void _resetPassword() async {
     if (_passwordController.text != _confirmPasswordController.text) {
       setState(() => _errorMessage = 'Passwords do not match');
-      HapticFeedback.vibrate();
+      HapticFeedback.heavyImpact();
       return;
     }
 
@@ -83,33 +53,30 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
       setState(() => _isLoading = false);
 
       if (result['success']) {
-        HapticFeedback.lightImpact();
+        HapticFeedback.mediumImpact();
         if (mounted) {
-          _showSuccessSnackBar();
+          _showStatusSnackBar('Password reset successfully!', true);
           Navigator.popUntil(context, (route) => route.isFirst);
         }
       } else {
-        HapticFeedback.mediumImpact();
-        setState(() {
-          _errorMessage = result['message'] ?? 'Failed to reset password';
-        });
+        setState(() => _errorMessage = result['message'] ?? 'Invalid code or password');
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Connection error. Please try again.';
+        _errorMessage = 'Service unavailable. Try again later.';
       });
     }
   }
 
-  void _showSuccessSnackBar() {
+  void _showStatusSnackBar(String message, bool isSuccess) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Password updated successfully', style: TextStyle(fontWeight: FontWeight.w600)),
-        backgroundColor: const Color(0xFF00B894),
+        content: Text(message, style: const TextStyle(fontWeight: FontWeight.w500)),
+        backgroundColor: isSuccess ? const Color(0xFF10B981) : const Color(0xFFEF4444),
         behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(20),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       ),
     );
   }
@@ -117,36 +84,103 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC), // Modern off-white
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle.light,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 16.0),
-          child: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
+      backgroundColor: backgroundColor,
+      body: CustomScrollView(
+        slivers: [
+          // 1. Modern Slim AppBar
+          SliverAppBar(
+            expandedHeight: 0,
+            backgroundColor: backgroundColor,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.chevron_left_rounded, color: textDark, size: 30),
+              onPressed: () => Navigator.pop(context),
+            ),
+            pinned: true,
           ),
-        ),
-      ),
-      body: Stack(
-        children: [
-          // 1. Refined Background
-          Positioned.fill(child: CustomPaint(painter: ModernBackgroundPainter())),
 
-          // 2. Content
-          Center(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: _buildMainCard(),
-                ),
+          // 2. Form Content
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 20),
+                  // Headline Section
+                  const Text(
+                    "Reset Password",
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      color: textDark,
+                      letterSpacing: -1,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(fontSize: 15, color: textMuted, height: 1.5),
+                      children: [
+                        const TextSpan(text: "We've sent a 6-digit verification code to "),
+                        TextSpan(
+                          text: widget.email,
+                          style: const TextStyle(color: primaryBlue, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+
+                  // Fields Section
+                  _buildInputLabel("Verification Code"),
+                  _buildModernField(
+                    controller: _otpController,
+                    hint: "000000",
+                    icon: Icons.numbers_rounded,
+                    isOtp: true,
+                  ),
+                  const SizedBox(height: 24),
+
+                  _buildInputLabel("New Password"),
+                  _buildModernField(
+                    controller: _passwordController,
+                    hint: "••••••••",
+                    icon: Icons.lock_outline_rounded,
+                    isPassword: true,
+                    isVisible: _isPasswordVisible,
+                    onToggle: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+                  ),
+                  const SizedBox(height: 24),
+
+                  _buildInputLabel("Confirm Password"),
+                  _buildModernField(
+                    controller: _confirmPasswordController,
+                    hint: "••••••••",
+                    icon: Icons.shield_outlined,
+                    isPassword: true,
+                    isVisible: _isConfirmPasswordVisible,
+                    onToggle: () => setState(() => _isConfirmPasswordVisible = !_isConfirmPasswordVisible),
+                  ),
+
+                  if (_errorMessage.isNotEmpty) _buildErrorContainer(),
+
+                  const SizedBox(height: 48),
+
+                  // Action Button
+                  _buildSubmitButton(),
+                  
+                  const SizedBox(height: 24),
+                  Center(
+                    child: TextButton(
+                      onPressed: () { /* Resend logic */ },
+                      child: const Text(
+                        "Resend Code",
+                        style: TextStyle(color: textMuted, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -155,221 +189,114 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
     );
   }
 
-  Widget _buildMainCard() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(32),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-        child: Container(
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.9),
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: Colors.white.withOpacity(0.4)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 40,
-                offset: const Offset(0, 20),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header section
-              _buildHeader(),
-              const SizedBox(height: 32),
-
-              // Form fields
-              _buildGlassTextField(
-                controller: _otpController,
-                hintText: 'Verification Code',
-                icon: Icons.pin_outlined,
-              ),
-              const SizedBox(height: 16),
-              _buildGlassTextField(
-                controller: _passwordController,
-                hintText: 'New Password',
-                icon: Icons.lock_open_rounded,
-                isPassword: true,
-                isVisible: _isPasswordVisible,
-                onVisibilityToggle: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
-              ),
-              const SizedBox(height: 16),
-              _buildGlassTextField(
-                controller: _confirmPasswordController,
-                hintText: 'Confirm New Password',
-                icon: Icons.shield_outlined,
-                isPassword: true,
-                isVisible: _isConfirmPasswordVisible,
-                onVisibilityToggle: () => setState(() => _isConfirmPasswordVisible = !_isConfirmPasswordVisible),
-              ),
-
-              // Error Display
-              if (_errorMessage.isNotEmpty) _buildErrorLabel(),
-
-              const SizedBox(height: 32),
-
-              // Main CTA
-              _buildSubmitButton(),
-            ],
-          ),
-        ),
+  Widget _buildInputLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: textDark),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Column(
-      children: [
-        Container(
-          height: 64,
-          width: 64,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF6366F1), Color(0xFFA855F7)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Icon(Icons.refresh_rounded, size: 32, color: Colors.white),
-        ),
-        const SizedBox(height: 20),
-        const Text(
-          'Security Update',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF1E293B),
-            letterSpacing: -0.5,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Verification for ${widget.email}',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: Colors.blueGrey.shade400, height: 1.4),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGlassTextField({
+  Widget _buildModernField({
     required TextEditingController controller,
-    required String hintText,
+    required String hint,
     required IconData icon,
     bool isPassword = false,
     bool isVisible = false,
-    VoidCallback? onVisibilityToggle,
+    bool isOtp = false,
+    VoidCallback? onToggle,
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9).withOpacity(0.5),
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: TextField(
         controller: controller,
         obscureText: isPassword && !isVisible,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+        keyboardType: isOtp ? TextInputType.number : TextInputType.text,
+        inputFormatters: isOtp ? [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)] : [],
+        style: const TextStyle(fontWeight: FontWeight.w600, color: textDark),
         decoration: InputDecoration(
-          hintText: hintText,
-          hintStyle: TextStyle(color: Colors.blueGrey.shade200, fontWeight: FontWeight.w400),
-          prefixIcon: Icon(icon, color: const Color(0xFF6366F1), size: 20),
+          hintText: hint,
+          hintStyle: TextStyle(color: textMuted.withOpacity(0.4)),
+          prefixIcon: Icon(icon, color: primaryBlue, size: 22),
           suffixIcon: isPassword
               ? IconButton(
-                  icon: Icon(isVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined, 
-                  color: Colors.blueGrey.shade300, size: 20),
-                  onPressed: onVisibilityToggle,
+                  icon: Icon(isVisible ? Icons.visibility_off : Icons.visibility, color: textMuted, size: 20),
+                  onPressed: onToggle,
                 )
               : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: primaryBlue, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
         ),
       ),
     );
   }
 
-  Widget _buildErrorLabel() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 16),
+  Widget _buildErrorContainer() {
+    return Container(
+      margin: const EdgeInsets.only(top: 20),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFEE2E2)),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_rounded, color: Colors.redAccent, size: 16),
-          const SizedBox(width: 6),
-          Text(_errorMessage, style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.w500)),
+          const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              _errorMessage,
+              style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildSubmitButton() {
-    return Container(
+    return SizedBox(
       width: double.infinity,
-      height: 58,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF4F46E5).withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+      height: 60,
       child: ElevatedButton(
         onPressed: _isLoading ? null : _resetPassword,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          backgroundColor: textDark,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 0,
         ),
         child: _isLoading
-            ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+            ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
             : const Text(
-                'Verify & Update',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.5),
+                "Update Password",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
               ),
       ),
     );
   }
-}
-
-class ModernBackgroundPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint();
-
-    // Deep modern gradient background
-    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
-    paint.shader = const LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Color(0xFF0F172A), Color(0xFF334155), Color(0xFF1E293B)],
-    ).createShader(rect);
-    canvas.drawRect(rect, paint);
-
-    // Decorative Blur Blobs
-    final blobPaint = Paint()..maskFilter = const MaskFilter.blur(BlurStyle.normal, 50);
-
-    blobPaint.color = const Color(0xFF6366F1).withOpacity(0.15);
-    canvas.drawCircle(Offset(size.width * 0.1, size.height * 0.2), 120, blobPaint);
-
-    blobPaint.color = const Color(0xFFA855F7).withOpacity(0.15);
-    canvas.drawCircle(Offset(size.width * 0.9, size.height * 0.7), 160, blobPaint);
-    
-    blobPaint.color = const Color(0xFF0EA5E9).withOpacity(0.1);
-    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.9), 100, blobPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
