@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../attendance/presentation/pages/DepAttendance.dart';
 import '../../../attendance/presentation/pages/Department_Report.dart';
@@ -40,7 +41,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   String _feedbackText = "";
   int _rating = 0;
 
@@ -54,10 +55,142 @@ class _HomePageState extends State<HomePage> {
   late final String attendanceSubtitle;
   late final IconData attendanceIcon;
 
+  late AnimationController _orbController;
+  late AnimationController _staggerController;
+  final List<Animation<double>> _staggerAnimations = [];
+
   @override
   void initState() {
     super.initState();
     _initializeTitles();
+
+    _orbController = AnimationController(
+      duration: const Duration(seconds: 10),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _staggerController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+
+    _initStaggerAnimations();
+
+    // Start entrance animation
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) _staggerController.forward();
+    });
+  }
+
+  void _initStaggerAnimations() {
+    for (int i = 0; i < 6; i++) {
+      // Enough for sections
+      _staggerAnimations.add(
+        CurvedAnimation(
+          parent: _staggerController,
+          curve: Interval(0.1 * i, 0.6 + (0.1 * i), curve: Curves.easeOutCubic),
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _orbController.dispose();
+    _staggerController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildStaggeredItem(int index, Widget child) {
+    if (index >= _staggerAnimations.length) return child;
+    return FadeTransition(
+      opacity: _staggerAnimations[index],
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.1),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(
+          parent: _staggerController,
+          curve: Interval(
+             0.1 * index, 
+             0.6 + (0.1 * index), 
+             curve: Curves.easeOutCubic
+          ),
+        )),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildAnimatedOrbs() {
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _orbController,
+        builder: (context, child) {
+          return Stack(
+            children: [
+              // Orb 1: Deep Purple
+              Positioned(
+                top: -100 + (_orbController.value * 30),
+                right: -50,
+                child: Container(
+                  width: 400,
+                  height: 400,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFF7C3AED).withOpacity(0.2), // Deep Purple
+                        const Color(0xFFC4B5FD).withOpacity(0.1),
+                        Colors.transparent,
+                      ],
+                      radius: 0.6,
+                    ),
+                  ),
+                ),
+              ),
+              // Orb 2: Ocean Blue
+              Positioned(
+                top: 150,
+                left: -80 - (_orbController.value * 40),
+                child: Container(
+                  width: 350,
+                  height: 350,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFF0EA5E9).withOpacity(0.15), // Sky Blue
+                        Colors.transparent,
+                      ],
+                      radius: 0.6,
+                    ),
+                  ),
+                ),
+              ),
+              // Orb 3: Rose Gold Accent
+              Positioned(
+                bottom: -50,
+                right: -20 + (_orbController.value * 20),
+                child: Container(
+                  width: 300,
+                  height: 300,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFFFB7185).withOpacity(0.15), // Rose
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   void _initializeTitles() {

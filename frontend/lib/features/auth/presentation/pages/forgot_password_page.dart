@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import '../../../../core/services/api_service.dart';
 import 'reset_password_page.dart';
 
@@ -13,56 +12,54 @@ class ForgotPasswordPage extends StatefulWidget {
 }
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final TextEditingController _emailController = TextEditingController();
   final List<String> _roles = ['User', 'Staff', 'HOD'];
   String _selectedRole = 'User';
   bool _isLoading = false;
   String _errorMessage = '';
 
-  late AnimationController _mainController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
-  late Animation<double> _scaleAnimation;
+  late AnimationController _orbController;
+  late AnimationController _staggerController;
+  final List<Animation<double>> _staggerAnimations = [];
 
   @override
   void initState() {
     super.initState();
-    _mainController = AnimationController(
+
+    _orbController = AnimationController(
+      duration: const Duration(seconds: 10),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _staggerController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _mainController,
-        curve: const Interval(0.0, 0.65, curve: Curves.easeOut),
-      ),
-    );
+    _initStaggerAnimations();
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.1),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _mainController,
-        curve: const Interval(0.1, 1.0, curve: Curves.easeOutCubic),
-      ),
-    );
+    // Start entrance animation after a slight delay
+    Future.delayed(const Duration(milliseconds: 200), () {
+      _staggerController.forward();
+    });
+  }
 
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _mainController,
-        curve: const Interval(0.0, 0.7, curve: Curves.elasticOut),
-      ),
-    );
-
-    _mainController.forward();
+  void _initStaggerAnimations() {
+    for (int i = 0; i < 4; i++) {
+      _staggerAnimations.add(
+        CurvedAnimation(
+          parent: _staggerController,
+          curve: Interval(0.1 * i, 0.6 + (0.1 * i), curve: Curves.easeOutCubic),
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
-    _mainController.dispose();
+    _orbController.dispose();
+    _staggerController.dispose();
     _emailController.dispose();
     super.dispose();
   }
@@ -91,12 +88,14 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
         if (mounted) {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder:
-                  (context) => ResetPasswordPage(
+            PageRouteBuilder(
+              pageBuilder:
+                  (_, a, __) => ResetPasswordPage(
                     email: _emailController.text.trim(),
                     role: _selectedRole.toLowerCase(),
                   ),
+              transitionsBuilder:
+                  (_, a, __, c) => FadeTransition(opacity: a, child: c),
             ),
           );
         }
@@ -117,372 +116,456 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.5),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Color(0xFF0F172A),
+              size: 18,
+            ),
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Stack(
+        fit: StackFit.expand,
         children: [
-          _buildMeshBackground(),
+          _buildAnimatedOrbs(),
           SafeArea(
-            child: CustomScrollView(
-              slivers: [
-                SliverAppBar(
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  leading: IconButton(
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 24,
                 ),
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: ScaleTransition(
-                            scale: _scaleAnimation,
-                            child: _buildGlassCard(),
+                child: Column(
+                  children: [
+                    // 1. Header Entrance
+                    _buildStaggeredItem(index: 0, child: _buildHeader()),
+                    const SizedBox(height: 40),
+
+                    // 2. Card Entrance
+                    _buildStaggeredItem(
+                      index: 1,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(28),
+                        child: RepaintBoundary(
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 40,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Colors.white.withOpacity(0.8),
+                                    Colors.white.withOpacity(0.5),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(28),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.6),
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF64748B,
+                                    ).withOpacity(0.1),
+                                    blurRadius: 40,
+                                    offset: const Offset(0, 15),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildModernInput(
+                                    controller: _emailController,
+                                    hint: "Email Address",
+                                    icon: Icons.alternate_email_rounded,
+                                    keyboardType: TextInputType.emailAddress,
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _buildModernDropdown(
+                                    value: _selectedRole,
+                                    items: _roles,
+                                    hint: "Account Role",
+                                    onChanged:
+                                        (val) =>
+                                            setState(() => _selectedRole = val),
+                                  ),
+                                  if (_errorMessage.isNotEmpty) ...[
+                                    const SizedBox(height: 24),
+                                    Text(
+                                      _errorMessage,
+                                      style: const TextStyle(
+                                        color: Color(0xFFDC2626),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                  const SizedBox(height: 32),
+                                  _buildSubmitButton(),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 40),
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // 3. Footer Entrance
+                    _buildStaggeredItem(
+                      index: 2,
+                      child: Text(
+                        "SECURE RECOVERY",
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 11,
+                          letterSpacing: 2.0,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStaggeredItem({required int index, required Widget child}) {
+    // Avoid range error if index exceeds animations length
+    if (index >= _staggerAnimations.length) return child;
+
+    return AnimatedBuilder(
+      animation: _staggerController,
+      builder: (context, child) {
+        final animation = _staggerAnimations[index];
+        return Transform.translate(
+          offset: Offset(0, 50 * (1 - animation.value)),
+          child: Opacity(opacity: animation.value, child: child),
+        );
+      },
+      child: child,
+    );
+  }
+
+  Widget _buildAnimatedOrbs() {
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _orbController,
+        builder: (context, child) {
+          return Stack(
+            children: [
+              // Orb 1: Deep Royal Purple
+              Positioned(
+                top: -100 + (_orbController.value * 60),
+                right: -60,
+                child: Container(
+                  width: 450,
+                  height: 450,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFF7C3AED).withOpacity(0.35),
+                        const Color(0xFFC4B5FD).withOpacity(0.15),
+                        Colors.transparent,
+                      ],
+                      radius: 0.65,
+                    ),
+                  ),
+                ),
+              ),
+              // Orb 2: Rich Ocean Blue
+              Positioned(
+                bottom: -80 - (_orbController.value * 50),
+                left: -100,
+                child: Container(
+                  width: 500,
+                  height: 500,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFF0EA5E9).withOpacity(0.3),
+                        const Color(0xFF38BDF8).withOpacity(0.15),
+                        Colors.transparent,
+                      ],
+                      radius: 0.65,
+                    ),
+                  ),
+                ),
+              ),
+              // Orb 3: Elegant Rose Gold
+              Positioned(
+                top: 60,
+                left: -60 + (_orbController.value * 30),
+                child: Container(
+                  width: 320,
+                  height: 320,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFFFB7185).withOpacity(0.2),
+                        Colors.transparent,
                       ],
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildMeshBackground() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F172A),
-      ), // Deep midnight base
-      child: Stack(
-        children: [
-          Positioned(
-            top: -100,
-            right: -50,
-            child: _buildBlurCircle(
-              300,
-              const Color(0xFF6366F1).withOpacity(0.4),
-            ),
-          ),
-          Positioned(
-            bottom: -50,
-            left: -50,
-            child: _buildBlurCircle(
-              400,
-              const Color(0xFFA855F7).withOpacity(0.3),
-            ),
-          ),
-          Positioned(
-            top: 200,
-            left: -100,
-            child: _buildBlurCircle(
-              250,
-              const Color(0xFFEC4899).withOpacity(0.2),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBlurCircle(double size, Color color) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
-        child: Container(color: Colors.transparent),
-      ),
-    );
-  }
-
-  Widget _buildGlassCard() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(32),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-        child: Container(
-          padding: const EdgeInsets.all(32),
+  Widget _buildHeader() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.15),
-              width: 1.5,
-            ),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.12),
-                Colors.white.withOpacity(0.02),
-              ],
-            ),
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF8B5CF6).withOpacity(0.2),
+                blurRadius: 30,
+                offset: const Offset(0, 15),
+              ),
+            ],
           ),
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildHeaderIcon(),
-                const SizedBox(height: 24),
-                const Text(
-                  'Password Recovery',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Enter your details below to receive a secure verification code.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.white.withOpacity(0.7),
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                _buildModernTextField(
-                  controller: _emailController,
-                  label: 'Email Address',
-                  icon: Icons.alternate_email_rounded,
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                const SizedBox(height: 16),
-                _buildModernDropdown(),
-                if (_errorMessage.isNotEmpty) _buildErrorBanner(),
-                const SizedBox(height: 32),
-                _buildSubmitButton(),
-              ],
-            ),
+          child: const Icon(
+            Icons.lock_reset_rounded,
+            color: Color(0xFF4F46E5),
+            size: 42,
           ),
         ),
-      ),
+        const SizedBox(height: 24),
+        const Text(
+          "Password Recovery",
+          style: TextStyle(
+            fontSize: 30,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF0F172A),
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          "Enter email to receive security code",
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: const Color(0xFF64748B),
+            letterSpacing: 0.2,
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildHeaderIcon() {
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFF6366F1).withOpacity(0.2),
-          shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
-        ),
-        child: const Icon(
-          Icons.shield_outlined,
-          size: 40,
-          color: Color(0xFF818CF8),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildModernTextField({
+  Widget _buildModernInput({
     required TextEditingController controller,
-    required String label,
+    required String hint,
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.1)),
-          ),
-          child: TextField(
-            controller: controller,
-            keyboardType: keyboardType,
-            style: const TextStyle(color: Colors.white, fontSize: 16),
-            decoration: InputDecoration(
-              prefixIcon: Icon(icon, color: const Color(0xFF818CF8), size: 20),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
-              ),
-              hintText: 'e.g. name@company.com',
-              hintStyle: TextStyle(
-                color: Colors.white.withOpacity(0.2),
-                fontSize: 15,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildModernDropdown() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            'Account Role',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.1)),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedRole,
-              isExpanded: true,
-              dropdownColor: const Color(0xFF1E293B),
-              icon: const Icon(
-                Icons.unfold_more_rounded,
-                color: Colors.white54,
-              ),
-              items:
-                  _roles.map((role) {
-                    return DropdownMenuItem(
-                      value: role,
-                      child: Text(
-                        role,
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    );
-                  }).toList(),
-              onChanged: (val) => setState(() => _selectedRole = val!),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildErrorBanner() {
     return Container(
-      margin: const EdgeInsets.only(top: 20),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.redAccent.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+        color: Colors.white.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.6)),
       ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: Colors.redAccent,
-            size: 18,
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        style: const TextStyle(
+          fontSize: 15,
+          color: Color(0xFF0F172A),
+          fontWeight: FontWeight.w600,
+        ),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+            color: const Color(0xFF64748B),
+            fontSize: 14,
+            fontWeight: FontWeight.normal,
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              _errorMessage,
-              style: const TextStyle(
-                color: Colors.redAccent,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+          prefixIcon: Icon(icon, color: const Color(0xFF64748B), size: 20),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 18,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernDropdown({
+    required String value,
+    required List<String> items,
+    required String hint,
+    required ValueChanged<String> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.6)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF64748B).withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          icon: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.expand_more_rounded,
+              color: Color(0xFF64748B),
+              size: 20,
+            ),
+          ),
+          style: const TextStyle(
+            color: Color(0xFF0F172A),
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+          items:
+              items.map((String item) {
+                return DropdownMenuItem<String>(
+                  value: item,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: (value == item
+                                      ? const Color(0xFF6366F1)
+                                      : const Color(0xFFCBD5E1))
+                                  .withOpacity(0.5),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                          color:
+                              value == item
+                                  ? const Color(0xFF6366F1)
+                                  : const Color(0xFFCBD5E1),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+
+                      Expanded(
+                        child: Text(
+                          item,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color:
+                                value == item
+                                    ? const Color(0xFF4F46E5)
+                                    : const Color(0xFF0F172A),
+                            fontWeight:
+                                value == item
+                                    ? FontWeight.bold
+                                    : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+          onChanged: (val) {
+            if (val != null) onChanged(val);
+          },
+        ),
       ),
     );
   }
 
   Widget _buildSubmitButton() {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : _sendOTP,
-        style: ElevatedButton.styleFrom(
-          padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+    return InkWell(
+      onTap: _isLoading ? null : _sendOTP,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1E293B), Color(0xFF020617)],
           ),
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          elevation: 0,
-        ),
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1E293B).withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF6366F1).withOpacity(0.4),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Container(
-            height: 58,
-            alignment: Alignment.center,
-            child:
-                _isLoading
-                    ? const SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.5,
-                      ),
-                    )
-                    : const Text(
-                      'Continue',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-          ),
+          ],
         ),
+        alignment: Alignment.center,
+        child:
+            _isLoading
+                ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+                : const Text(
+                  "Send Reset Link",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
       ),
     );
   }

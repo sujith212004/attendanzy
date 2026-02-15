@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 
-/// Cinematic Ultra-Smooth Splash Animation
+/// Vibrant Kinetic ERP Splash Animation
 ///
-/// Features buttery-smooth 60fps animations with:
-/// - Fluid morphing transitions
-/// - Cinematic easing curves
-/// - Realistic depth & lighting
-/// - Organic micro-movements
-
+/// Features:
+/// - "Pearlescent White" Background (Subtle multicolored aura)
+/// - Vibrant Gradient Modules (Blue, Red, Orange, Green, Purple)
+/// - "Breathing" Kinetic Nodes (Pulse animation)
+/// - "Trail" Data Packets (High speed feel)
 class MinimalSplashAnimation extends StatefulWidget {
   final VoidCallback onComplete;
   final Duration duration;
@@ -17,7 +16,7 @@ class MinimalSplashAnimation extends StatefulWidget {
   const MinimalSplashAnimation({
     Key? key,
     required this.onComplete,
-    this.duration = const Duration(milliseconds: 4500),
+    this.duration = const Duration(seconds: 6),
   }) : super(key: key);
 
   @override
@@ -27,44 +26,24 @@ class MinimalSplashAnimation extends StatefulWidget {
 class _MinimalSplashAnimationState extends State<MinimalSplashAnimation>
     with TickerProviderStateMixin {
   late AnimationController _mainController;
-  late AnimationController _flowController;
-  late AnimationController _glowController;
-
-  final List<_FloatingOrb> _orbs = [];
+  late AnimationController _pulseController;
+  late AnimationController _orbitController;
 
   @override
   void initState() {
     super.initState();
 
-    final random = math.Random(42);
-
-    // Create organic floating orbs
-    for (int i = 0; i < 5; i++) {
-      _orbs.add(
-        _FloatingOrb(
-          baseX: random.nextDouble() * 0.8 + 0.1,
-          baseY: random.nextDouble() * 0.8 + 0.1,
-          size: random.nextDouble() * 120 + 80,
-          color: _getOrbColor(i),
-          phaseOffset: random.nextDouble() * math.pi * 2,
-          speed: random.nextDouble() * 0.3 + 0.2,
-        ),
-      );
-    }
-
     _mainController = AnimationController(
       vsync: this,
       duration: widget.duration,
     );
-
-    _flowController = AnimationController(
+    _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 4000),
+      duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
-
-    _glowController = AnimationController(
+    _orbitController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3000),
+      duration: const Duration(seconds: 15),
     )..repeat();
 
     _mainController.forward().then((_) {
@@ -72,59 +51,12 @@ class _MinimalSplashAnimationState extends State<MinimalSplashAnimation>
     });
   }
 
-  Color _getOrbColor(int index) {
-    const colors = [
-      Color(0xFF8B5CF6), // Purple
-      Color(0xFF06B6D4), // Cyan
-      Color(0xFFF472B6), // Pink
-      Color(0xFF10B981), // Green
-      Color(0xFFF59E0B), // Amber
-    ];
-    return colors[index % colors.length];
-  }
-
   @override
   void dispose() {
     _mainController.dispose();
-    _flowController.dispose();
-    _glowController.dispose();
+    _pulseController.dispose();
+    _orbitController.dispose();
     super.dispose();
-  }
-
-  // Ultra-smooth clamping
-  double _clamp(double v) => v <= 0.0 ? 0.0 : (v >= 1.0 ? 1.0 : v);
-
-  // Quintic ease in-out for buttery smoothness
-  double _easeInOutQuint(double x) {
-    x = _clamp(x);
-    return x < 0.5 ? 16 * x * x * x * x * x : 1 - math.pow(-2 * x + 2, 5) / 2;
-  }
-
-  // Smooth step (Hermite interpolation)
-  double _smoothStep(double x) {
-    x = _clamp(x);
-    return x * x * (3.0 - 2.0 * x);
-  }
-
-  // Ken Perlin's smoother step
-  double _smootherStep(double x) {
-    x = _clamp(x);
-    return x * x * x * (x * (x * 6.0 - 15.0) + 10.0);
-  }
-
-  // Soft elastic for gentle bounce
-  double _softElastic(double x) {
-    x = _clamp(x);
-    if (x == 0 || x == 1) return x;
-    return math.pow(2, -8 * x) *
-            math.sin((x * 10 - 0.75) * ((2 * math.pi) / 3)) +
-        1;
-  }
-
-  // Cinematic ease out
-  double _cinematicOut(double x) {
-    x = _clamp(x);
-    return 1 - math.pow(1 - x, 4).toDouble();
   }
 
   @override
@@ -136,119 +68,184 @@ class _MinimalSplashAnimationState extends State<MinimalSplashAnimation>
       body: AnimatedBuilder(
         animation: Listenable.merge([
           _mainController,
-          _flowController,
-          _glowController,
+          _pulseController,
+          _orbitController,
         ]),
         builder: (context, child) {
-          final progress = _clamp(_mainController.value);
-          final flow = _clamp(_flowController.value);
-          final glow = _clamp(_glowController.value);
+          final progress = _mainController.value;
+          final pulse = _pulseController.value;
+          final orbit = _orbitController.value;
 
-          return Container(
-            width: size.width,
-            height: size.height,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFFFFFFFE),
-                  Color.lerp(
-                    const Color(0xFFFAF5FF),
-                    const Color(0xFFF0FDFA),
-                    _smoothStep(flow),
-                  )!,
-                  const Color(0xFFFFFFFE),
-                ],
-              ),
-            ),
-            child: Stack(
-              children: [
-                // Ambient floating orbs
-                _buildAmbientOrbs(progress, flow, size),
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              // 1. Pearlescent Background (Subtle moving colors)
+              _buildPearlescentBackground(orbit),
 
-                // Soft light bloom
-                _buildLightBloom(progress, flow, glow, size),
+              // 2. Kinetic Ecosystem (Vibrant Nodes)
+              _buildVibrantEcosystem(progress, orbit, pulse, size),
 
-                // Feature cards
-                _buildFeatureCards(progress, flow, size),
+              // 3. Center Hub (Logo)
+              _buildCentralHub(progress, pulse),
 
-                // Central logo
-                _buildLogo(progress, flow, glow),
+              // 4. Professional Branding
+              _buildBranding(progress, size),
 
-                // App branding
-                _buildBranding(progress, flow, size),
-
-                // Smooth fade out
-                _buildFadeOut(progress),
-              ],
-            ),
+              // 5. Clean Exit
+              if (progress > 0.94) _buildFadeOut(progress),
+            ],
           );
         },
       ),
     );
   }
 
-  Widget _buildAmbientOrbs(double progress, double flow, Size size) {
-    if (progress > 0.88) return const SizedBox.shrink();
-
-    final fadeOut = _clamp(1.0 - (progress - 0.7) / 0.18);
-    final opacity = _smoothStep(fadeOut) * 0.4;
-
+  Widget _buildPearlescentBackground(double time) {
+    // Subtle multicolored gradients moving slowly
     return Stack(
-      children:
-          _orbs.map((orb) {
-            final time = flow * math.pi * 2 + orb.phaseOffset;
-            final x = orb.baseX + math.sin(time * orb.speed) * 0.08;
-            final y = orb.baseY + math.cos(time * orb.speed * 0.7) * 0.06;
-            final scale = 1.0 + math.sin(time * 0.5) * 0.15;
-
-            return Positioned(
-              left: x * size.width - orb.size / 2,
-              top: y * size.height - orb.size / 2,
-              child: ImageFiltered(
-                imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-                child: Container(
-                  width: orb.size * scale,
-                  height: orb.size * scale,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: orb.color.withOpacity(opacity),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
+      children: [
+        Container(color: Colors.white),
+        Positioned(
+          top: -100,
+          left: -100,
+          child: _AuraSpot(color: Colors.blue.withOpacity(0.08), size: 400),
+        ),
+        Positioned(
+          bottom: -100,
+          right: -100,
+          child: _AuraSpot(color: Colors.purple.withOpacity(0.08), size: 400),
+        ),
+        Align(
+          alignment: Alignment(
+            math.sin(time * 2 * math.pi),
+            math.cos(time * 2 * math.pi),
+          ),
+          child: _AuraSpot(color: Colors.teal.withOpacity(0.05), size: 600),
+        ),
+        BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
+          child: Container(color: Colors.white.withOpacity(0.4)),
+        ),
+      ],
     );
   }
 
-  Widget _buildLightBloom(
+  Widget _buildVibrantEcosystem(
     double progress,
-    double flow,
-    double glow,
+    double orbit,
+    double pulse,
     Size size,
   ) {
     if (progress > 0.85) return const SizedBox.shrink();
 
-    final fadeOut = _clamp(1.0 - (progress - 0.6) / 0.25);
-    final opacity = _smoothStep(fadeOut) * 0.25;
-    final pulse = 1.0 + math.sin(glow * math.pi * 2) * 0.1;
+    // Vibrant Modules
+    final modules = [
+      _Module("ATTENDANCE", Icons.qr_code_scanner, [
+        const Color(0xFF3B82F6),
+        const Color(0xFF2563EB),
+      ]), // Blue
+      _Module("EXAMS", Icons.quiz_outlined, [
+        const Color(0xFFEF4444),
+        const Color(0xFFDC2626),
+      ]), // Red
+      _Module("LIBRARY", Icons.menu_book_rounded, [
+        const Color(0xFFF59E0B),
+        const Color(0xFFD97706),
+      ]), // Amber
+      _Module("FINANCE", Icons.account_balance_wallet_outlined, [
+        const Color(0xFF10B981),
+        const Color(0xFF059669),
+      ]), // Emerald
+      _Module("TRANSPORT", Icons.directions_bus_filled_outlined, [
+        const Color(0xFF8B5CF6),
+        const Color(0xFF7C3AED),
+      ]), // Violet
+      _Module("HOSTEL", Icons.apartment_rounded, [
+        const Color(0xFFEC4899),
+        const Color(0xFFDB2777),
+      ]), // Pink
+    ];
+
+    final radius = size.width * 0.38; // Slightly larger spread
+    final center = Offset(size.width / 2, size.height / 2 - 50);
+
+    return Stack(
+      children: [
+        // Connecting Lines & Trail Packets
+        CustomPaint(
+          size: size,
+          painter: _KineticConnectivityPainter(
+            modules: modules.length,
+            rotation: orbit,
+            radius: radius,
+            center: center,
+            progress: progress,
+          ),
+        ),
+
+        // Orbiting Vibrant Nodes
+        ...List.generate(modules.length, (index) {
+          final angle =
+              (2 * math.pi * index / modules.length) + (orbit * 2 * math.pi);
+          final x = center.dx + radius * math.cos(angle);
+          final y = center.dy + radius * math.sin(angle);
+
+          final entrance = Curves.easeOutBack.transform(
+            ((progress - 0.2) * 2).clamp(0.0, 1.0),
+          );
+          // Pulse breathing effect
+          final breathe = 1.0 + (math.sin(pulse * math.pi * 2 + index) * 0.05);
+          final scale = entrance.clamp(0.0, 1.0) * breathe;
+
+          return Positioned(
+            left: x - 30, // Center the 60px widget
+            top: y - 30,
+            child: Transform.scale(
+              scale: scale,
+              child: _VibrantNode(module: modules[index]),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildCentralHub(double progress, double pulse) {
+    if (progress > 0.8) return const SizedBox.shrink();
+
+    final entrance = Curves.easeOutBack.transform(
+      (progress * 2.0).clamp(0.0, 1.0),
+    );
+    final breathe = 1.0 + (math.sin(pulse * math.pi * 2) * 0.02);
+    final scale = entrance * breathe;
 
     return Center(
-      child: ImageFiltered(
-        imageFilter: ImageFilter.blur(sigmaX: 100, sigmaY: 100),
-        child: Container(
-          width: 300 * pulse,
-          height: 300 * pulse,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [
-                const Color(0xFF8B5CF6).withOpacity(opacity),
-                const Color(0xFF06B6D4).withOpacity(opacity * 0.5),
-                Colors.transparent,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 100),
+        child: Transform.scale(
+          scale: scale,
+          child: Container(
+            width: 110,
+            height: 110,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 40,
+                  spreadRadius: 10,
+                ),
+                BoxShadow(
+                  color: Colors.blue.withOpacity(0.1),
+                  blurRadius: 20,
+                  spreadRadius: -5,
+                ),
               ],
-              stops: const [0.0, 0.5, 1.0],
+            ),
+            padding: const EdgeInsets.all(22),
+            child: ClipOval(
+              child: Image.asset('assets/icon/icon.png', fit: BoxFit.cover),
             ),
           ),
         ),
@@ -256,196 +253,56 @@ class _MinimalSplashAnimationState extends State<MinimalSplashAnimation>
     );
   }
 
-  Widget _buildFeatureCards(double progress, double flow, Size size) {
-    if (progress > 0.70) return const SizedBox.shrink();
+  Widget _buildBranding(double progress, Size size) {
+    if (progress < 0.2) return const SizedBox.shrink();
 
-    final cardPhase = _clamp(progress / 0.65);
-
-    final features = [
-      _Feature(Icons.article_rounded, const Color(0xFF7C3AED), 'OD', -135.0),
-      _Feature(
-        Icons.event_available_rounded,
-        const Color(0xFF0891B2),
-        'Leave',
-        -45.0,
-      ),
-      _Feature(
-        Icons.fingerprint_rounded,
-        const Color(0xFFDC2626),
-        'Mark',
-        135.0,
-      ),
-      _Feature(Icons.dashboard_rounded, const Color(0xFF059669), 'Table', 45.0),
-    ];
-
-    return Stack(
-      alignment: Alignment.center,
-      children: List.generate(features.length, (i) {
-        final feature = features[i];
-
-        // Staggered timing for each card
-        final stagger = i * 0.06;
-        final cardProg = _clamp((cardPhase - stagger) / (1.0 - stagger));
-
-        // Smooth entrance and exit
-        final entrancePhase = _clamp(cardProg / 0.35);
-        final exitPhase = _clamp((cardProg - 0.65) / 0.35);
-
-        final smoothEntrance = _easeInOutQuint(entrancePhase);
-        final smoothExit = _smootherStep(exitPhase);
-
-        // Distance animation
-        final startDist = 280.0;
-        final distanceMultiplier = 1.0 - smoothEntrance + (smoothExit * 0.8);
-        final currentDist = startDist * distanceMultiplier;
-
-        final angleRad = feature.angle * (math.pi / 180);
-        final xPos = math.cos(angleRad) * currentDist;
-        final yPos = math.sin(angleRad) * currentDist;
-
-        // Scale with soft elastic on entrance
-        double scale;
-        if (cardProg < 0.35) {
-          scale = _softElastic(entrancePhase);
-        } else if (cardProg < 0.65) {
-          scale = 1.0;
-        } else {
-          scale = 1.0 - (smoothExit * 0.6);
-        }
-
-        // Opacity with cinematic fade
-        double opacity;
-        if (cardProg < 0.25) {
-          opacity = _cinematicOut(_clamp(cardProg / 0.25));
-        } else if (cardProg < 0.60) {
-          opacity = 1.0;
-        } else {
-          opacity = 1.0 - _smootherStep(exitPhase);
-        }
-
-        // Organic floating motion
-        final time = flow * math.pi * 2;
-        final floatY = math.sin(time + i * 1.5) * 10 * (1.0 - smoothEntrance);
-        final floatX = math.cos(time * 0.8 + i) * 6 * (1.0 - smoothEntrance);
-
-        // Subtle rotation
-        final rotation = (1.0 - smoothEntrance) * (i.isEven ? 0.05 : -0.05);
-
-        return Positioned(
-          left: size.width / 2 + xPos + floatX - 46,
-          top: size.height / 2 + yPos + floatY - 46,
-          child: Transform.rotate(
-            angle: rotation,
-            child: Transform.scale(
-              scale: scale,
-              child: Opacity(
-                opacity: _clamp(opacity),
-                child: _buildCard(feature, flow),
-              ),
-            ),
-          ),
-        );
-      }),
+    final entrance = Curves.easeOutCubic.transform(
+      ((progress - 0.2) * 1.5).clamp(0.0, 1.0),
     );
-  }
+    final exit = ((progress - 0.94) * 10).clamp(0.0, 1.0);
+    final opacity = (entrance * (1.0 - exit)).clamp(0.0, 1.0);
 
-  Widget _buildCard(_Feature feature, double flow) {
-    return Container(
-      width: 92,
-      height: 92,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          // Soft ambient shadow
-          BoxShadow(
-            color: feature.color.withOpacity(0.12),
-            blurRadius: 50,
-            spreadRadius: -10,
-            offset: const Offset(0, 25),
-          ),
-          // Medium shadow for depth
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 30,
-            offset: const Offset(0, 15),
-          ),
-          // Contact shadow
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: Stack(
+    return Positioned(
+      bottom: size.height * 0.1,
+      left: 0,
+      right: 0,
+      child: Opacity(
+        opacity: opacity,
+        child: Column(
           children: [
-            // Gradient background
+            ShaderMask(
+              shaderCallback:
+                  (bounds) => const LinearGradient(
+                    colors: [
+                      Color(0xFF1E3A8A),
+                      Color(0xFF2563EB),
+                      Color(0xFF1E3A8A),
+                    ],
+                  ).createShader(bounds),
+              child: const Text(
+                "ATTENDANZY",
+                style: TextStyle(
+                  fontSize: 38,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white, // Masked
+                  letterSpacing: -1.0,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Colors.white, feature.color.withOpacity(0.04)],
-                ),
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(20),
               ),
-            ),
-            // Top shine
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 46,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.white.withOpacity(0.95),
-                      Colors.white.withOpacity(0.0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // Icon container
-            Center(
-              child: Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      feature.color,
-                      Color.lerp(feature.color, Colors.black, 0.15)!,
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: feature.color.withOpacity(0.45),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Icon(feature.icon, size: 28, color: Colors.white),
-              ),
-            ),
-            // Subtle border
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.9),
-                    width: 1.5,
-                  ),
+              child: const Text(
+                "THE CAMPUS ECOSYSTEM",
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF64748B),
+                  letterSpacing: 1.5,
                 ),
               ),
             ),
@@ -455,307 +312,161 @@ class _MinimalSplashAnimationState extends State<MinimalSplashAnimation>
     );
   }
 
-  Widget _buildLogo(double progress, double flow, double glow) {
-    if (progress < 0.50) return const SizedBox.shrink();
+  Widget _buildFadeOut(double progress) {
+    return Container(
+      color: Colors.white.withOpacity(
+        ((progress - 0.94) / 0.06).clamp(0.0, 1.0),
+      ),
+    );
+  }
+}
 
-    final logoPhase = _clamp((progress - 0.50) / 0.38);
+// --- Components & Painters ---
 
-    // Ultra-smooth entrance
-    final entrancePhase = _clamp(logoPhase / 0.4);
-    final smoothEntrance = _easeInOutQuint(entrancePhase);
+class _Module {
+  final String label;
+  final IconData icon;
+  final List<Color> gradient;
+  _Module(this.label, this.icon, this.gradient);
+}
 
-    // Gentle elastic settle
-    double scale;
-    if (logoPhase < 0.4) {
-      scale = _softElastic(entrancePhase) * 1.0;
-    } else {
-      scale = 1.0;
-    }
+class _AuraSpot extends StatelessWidget {
+  final Color color;
+  final double size;
+  const _AuraSpot({required this.color, required this.size});
 
-    // Smooth breathing
-    final breathe = 1.0 + math.sin(flow * math.pi * 2) * 0.008 * smoothEntrance;
-
-    // Cinematic fade in
-    final opacity = _cinematicOut(_clamp(logoPhase / 0.3));
-
-    // Shimmer rotation
-    final shimmerAngle = glow * math.pi * 2;
-
-    return Center(
-      child: Transform.scale(
-        scale: scale * breathe,
-        child: Opacity(
-          opacity: _clamp(opacity),
-          child: Container(
-            width: 165,
-            height: 165,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
-              boxShadow: [
-                // Colored glow
-                BoxShadow(
-                  color: const Color(0xFF8B5CF6).withOpacity(0.18 * opacity),
-                  blurRadius: 100,
-                  spreadRadius: 25,
-                ),
-                BoxShadow(
-                  color: const Color(0xFF06B6D4).withOpacity(0.12 * opacity),
-                  blurRadius: 120,
-                  spreadRadius: 35,
-                ),
-                // Realistic shadows
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.07),
-                  blurRadius: 60,
-                  offset: const Offset(0, 30),
-                ),
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 25,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Animated shimmer ring
-                Transform.rotate(
-                  angle: shimmerAngle,
-                  child: Container(
-                    width: 163,
-                    height: 163,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: SweepGradient(
-                        colors: [
-                          Colors.transparent,
-                          const Color(0xFF8B5CF6).withOpacity(0.2),
-                          const Color(0xFF06B6D4).withOpacity(0.2),
-                          Colors.transparent,
-                        ],
-                        stops: const [0.0, 0.25, 0.75, 1.0],
-                      ),
-                    ),
-                  ),
-                ),
-                // Inner container
-                Container(
-                  width: 145,
-                  height: 145,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    border: Border.all(color: Colors.white, width: 4),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF8B5CF6).withOpacity(0.1),
-                        blurRadius: 15,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/icon/icon.png',
-                      width: 137,
-                      height: 137,
-                      fit: BoxFit.cover,
-                      errorBuilder:
-                          (_, __, ___) => Container(
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [Color(0xFF7C3AED), Color(0xFF06B6D4)],
-                              ),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                'A',
-                                style: TextStyle(
-                                  fontSize: 68,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                    ),
-                  ),
-                ),
-                // Top highlight
-                Positioned(
-                  top: 12,
-                  child: Container(
-                    width: 50,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.white.withOpacity(0.7),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [color, color.withOpacity(0)],
+          stops: const [0.2, 1.0],
         ),
       ),
     );
   }
+}
 
-  Widget _buildBranding(double progress, double flow, Size size) {
-    if (progress < 0.58) return const SizedBox.shrink();
+class _VibrantNode extends StatelessWidget {
+  final _Module module;
+  const _VibrantNode({required this.module});
 
-    final brandPhase = _clamp((progress - 0.58) / 0.30);
-    final smoothBrand = _easeInOutQuint(brandPhase);
-
-    final opacity = _cinematicOut(_clamp(brandPhase / 0.4));
-    final slideY = 40.0 * (1.0 - smoothBrand);
-
-    return Positioned(
-      bottom: size.height * 0.14,
-      left: 0,
-      right: 0,
-      child: Transform.translate(
-        offset: Offset(0, slideY),
-        child: Opacity(
-          opacity: _clamp(opacity),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // App name with depth shadow
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Shadow layer
-                  Text(
-                    'Attendanzy',
-                    style: TextStyle(
-                      fontSize: 42,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black.withOpacity(0.04),
-                      letterSpacing: -1.5,
-                    ),
-                  ),
-                  // Main gradient text
-                  ShaderMask(
-                    shaderCallback:
-                        (bounds) => const LinearGradient(
-                          colors: [
-                            Color(0xFF5B21B6),
-                            Color(0xFF7C3AED),
-                            Color(0xFF0891B2),
-                          ],
-                        ).createShader(bounds),
-                    child: const Text(
-                      'Attendanzy',
-                      style: TextStyle(
-                        fontSize: 42,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: -1.5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              // Tagline pill
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF7C3AED), Color(0xFF06B6D4)],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF7C3AED).withOpacity(0.5),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Smart Attendance Management',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF374151),
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
-                ),
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: module.gradient,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: module.gradient.first.withOpacity(0.3),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
+          child: Icon(module.icon, color: Colors.white, size: 28),
         ),
-      ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Text(
+            module.label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: module.gradient.last, // Match branding color
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+      ],
     );
   }
-
-  Widget _buildFadeOut(double progress) {
-    if (progress < 0.94) return const SizedBox.shrink();
-
-    final fadePhase = _clamp((progress - 0.94) / 0.06);
-    final opacity = _smootherStep(fadePhase);
-
-    return Container(color: Colors.white.withOpacity(_clamp(opacity)));
-  }
 }
 
-class _Feature {
-  final IconData icon;
-  final Color color;
-  final String label;
-  final double angle;
+class _KineticConnectivityPainter extends CustomPainter {
+  final int modules;
+  final double rotation, radius, progress;
+  final Offset center;
 
-  _Feature(this.icon, this.color, this.label, this.angle);
-}
-
-class _FloatingOrb {
-  final double baseX;
-  final double baseY;
-  final double size;
-  final Color color;
-  final double phaseOffset;
-  final double speed;
-
-  _FloatingOrb({
-    required this.baseX,
-    required this.baseY,
-    required this.size,
-    required this.color,
-    required this.phaseOffset,
-    required this.speed,
+  _KineticConnectivityPainter({
+    required this.modules,
+    required this.rotation,
+    required this.radius,
+    required this.center,
+    required this.progress,
   });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint =
+        Paint()
+          ..color = const Color(0xFFCBD5E1) // Slate 300
+          ..strokeWidth =
+              1.5 // Thicker
+          ..style = PaintingStyle.stroke;
+
+    for (int i = 0; i < modules; i++) {
+      final angle = (2 * math.pi * i / modules) + (rotation * 2 * math.pi);
+      final endX = center.dx + radius * math.cos(angle);
+      final endY = center.dy + radius * math.sin(angle);
+      final endPoint = Offset(endX, endY);
+
+      // Draw connecting line
+      if (progress > 0.3) {
+        final lineProgress = ((progress - 0.3) * 2).clamp(0.0, 1.0);
+        final currentEnd = Offset.lerp(center, endPoint, lineProgress)!;
+        canvas.drawLine(center, currentEnd, linePaint);
+      }
+
+      // Draw Kinetic Data Trail
+      if (progress > 0.4) {
+        final dataT = (rotation * 3 + i * 0.4) % 1.0; // Loop 0-1
+        final pos = Offset.lerp(center, endPoint, dataT)!;
+
+        // Trail Effect
+        for (int j = 0; j < 5; j++) {
+          final trailPos =
+              Offset.lerp(
+                center,
+                endPoint,
+                (dataT - j * 0.02).clamp(0.0, 1.0),
+              )!;
+          final trailPaint =
+              Paint()
+                ..color = const Color(0xFF3B82F6).withOpacity(1.0 - j * 0.2)
+                ..style = PaintingStyle.fill;
+          canvas.drawCircle(trailPos, 3.0 - j * 0.5, trailPaint);
+        }
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
