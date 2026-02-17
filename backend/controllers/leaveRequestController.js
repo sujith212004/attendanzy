@@ -147,9 +147,10 @@ exports.getHODLeaveRequests = async (req, res) => {
     try {
         const { department } = req.query;
 
+        // Only fetch requests that have been approved by staff
+        // Don't filter by hodStatus - let frontend handle filtering by status
         const query = {
             staffStatus: 'approved',
-            hodStatus: 'pending',
         };
 
         if (department) query.department = department;

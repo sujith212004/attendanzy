@@ -35,6 +35,8 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     'Electrical Engineering',
     'Electronics and Communication Engineering',
     'Information Technology',
+    'Mechatronics',
+    'Artificial Intelligence and Data Science',
   ];
   int _selectedRoleIndex = 0;
   int _selectedDepartmentIndex = 0;
@@ -141,6 +143,17 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
         if (result['success']) {
           HapticFeedback.heavyImpact();
           final user = result['profile'];
+
+          // DEBUG: Print what the API actually returned
+          print('=== LOGIN DEBUG ===');
+          print('Selected Role: $selectedRole');
+          print('API Response - Full User Object: $user');
+          print('User year field: ${user['year']}');
+          print('User sec field: ${user['sec']}');
+          print('User Year field: ${user['Year']}');
+          print('User Sec field: ${user['Sec']}');
+          print('==================');
+
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(
             'email',
@@ -157,11 +170,20 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
           if (selectedRole == 'user') {
             await prefs.setString('year', user['year'] ?? '');
             await prefs.setString('sec', user['sec'] ?? '');
-          } else if (selectedRole == 'staff') {
+          }
+
+          if (selectedRole == 'staff') {
+            await prefs.setString('year', user['year'] ?? '');
+            await prefs.setString('sec', user['sec'] ?? '');
             await prefs.setString(
               'staffName',
               user['name'] ?? user['Name'] ?? '',
             );
+          }
+
+          if (selectedRole == 'hod') {
+            await prefs.setString('year', user['year'] ?? '');
+            await prefs.setString('sec', user['sec'] ?? '');
           }
 
           final userEmail = user["email"] ?? user["College Email"] ?? '';
