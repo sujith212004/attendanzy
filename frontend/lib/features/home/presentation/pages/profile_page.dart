@@ -48,791 +48,482 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: const Color(0xFFF8FAFC),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: Container(
+          margin: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.8),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.5),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF64748B).withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Color(0xFF1E293B),
+              size: 18,
+            ),
+          ),
+        ),
         title: const Text(
-          'My Profile',
+          'Profile',
           style: TextStyle(
+            color: Color(0xFF1E293B),
             fontWeight: FontWeight.w700,
-            fontSize: 22,
-            color: Color(0xFF1A202C),
+            fontSize: 18,
             letterSpacing: -0.5,
           ),
         ),
-        centerTitle: false,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        shadowColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        toolbarHeight: 75,
-        leadingWidth: 70,
-        leading: Container(
-          margin: const EdgeInsets.only(left: 20, top: 12, bottom: 12),
-          child: Center(
-            child: Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF667EEA).withOpacity(0.1),
-                    const Color(0xFF764BA2).withOpacity(0.1),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: const Color(0xFF667EEA).withOpacity(0.2),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF667EEA).withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => Navigator.of(context).pop(),
-                  borderRadius: BorderRadius.circular(14),
-                  child: const Center(
-                    child: Icon(
-                      Icons.arrow_back_ios_new,
-                      color: Color(0xFF667EEA),
-                      size: 18,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        // actions: [
-        //   Container(
-        //     margin: const EdgeInsets.only(right: 20, top: 12, bottom: 12),
-        //     child: Center(
-        //       child: Container(
-        //         width: 46,
-        //         height: 46,
-        //         decoration: BoxDecoration(
-        //           gradient: LinearGradient(
-        //             colors: [
-        //               const Color(0xFF667EEA).withOpacity(0.1),
-        //               const Color(0xFF764BA2).withOpacity(0.1),
-        //             ],
-        //             begin: Alignment.topLeft,
-        //             end: Alignment.bottomRight,
-        //           ),
-        //           borderRadius: BorderRadius.circular(14),
-        //           border: Border.all(
-        //             color: const Color(0xFF667EEA).withOpacity(0.2),
-        //             width: 1.5,
-        //           ),
-        //           boxShadow: [
-        //             BoxShadow(
-        //               color: const Color(0xFF667EEA).withOpacity(0.1),
-        //               blurRadius: 8,
-        //               offset: const Offset(0, 2),
-        //             ),
-        //           ],
-        //         ),
-        //         // child: Material(
-        //         //   color: Colors.transparent,
-        //         //   child: InkWell(
-        //         //     onTap: () {
-        //         //       // Future: Add edit profile functionality
-        //         //       ScaffoldMessenger.of(context).showSnackBar(
-        //         //         const SnackBar(
-        //         //           content: Text('Edit profile feature coming soon!'),
-        //         //           duration: Duration(seconds: 2),
-        //         //         ),
-        //         //       );
-        //         //     },
-        //         //     borderRadius: BorderRadius.circular(14),
-        //         //     child: const Center(
-        //         //       child: Icon(
-        //         //         Icons.edit_outlined,
-        //         //         color: Color(0xFF667EEA),
-        //         //         size: 18,
-        //         //       ),
-        //         //     ),
-        //         //   ),
-        //         // ),
-        //       ),
-        //     ),
-        //   ),
-        // ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(
-            height: 1,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.transparent,
-                  const Color(0xFF667EEA).withOpacity(0.3),
-                  const Color(0xFF764BA2).withOpacity(0.3),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-          ),
-        ),
+        centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            // Enhanced Profile Header Card
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF667EEA),
-                    Color(0xFF764BA2),
-                    Color(0xFF667EEA),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  stops: [0.0, 0.5, 1.0],
-                ),
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF667EEA).withOpacity(0.4),
-                    blurRadius: 30,
-                    offset: const Offset(0, 15),
-                    spreadRadius: 5,
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(28),
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.white.withOpacity(0.15),
-                        Colors.white.withOpacity(0.05),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+      body: Stack(
+        children: [
+          // Aurora Background
+          Positioned(
+            top: -100,
+            left: -100,
+            child: TweenAnimationBuilder(
+              tween: Tween<double>(begin: 0, end: 1),
+              duration: const Duration(seconds: 3),
+              builder: (context, double value, child) {
+                return Transform.translate(
+                  offset: Offset(value * 20, value * 20),
+                  child: Container(
+                    width: 400,
+                    height: 400,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          const Color(0xFF818CF8).withOpacity(0.15),
+                          Colors.transparent,
+                        ],
+                      ),
                     ),
                   ),
-                  child: Stack(
-                    children: [
-                      // Animated background patterns
-                      Positioned(
-                        right: -60,
-                        top: -60,
-                        child: Container(
-                          width: 180,
-                          height: 180,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                Colors.white.withOpacity(0.2),
-                                Colors.white.withOpacity(0.1),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: -40,
-                        bottom: -40,
-                        child: Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                Colors.white.withOpacity(0.15),
-                                Colors.white.withOpacity(0.05),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Floating accent elements
-                      Positioned(
-                        right: 80,
-                        top: 30,
-                        child: Container(
-                          width: 25,
-                          height: 25,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.3),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.white.withOpacity(0.2),
-                                blurRadius: 10,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: 60,
-                        top: 40,
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.4),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: 40,
-                        bottom: 80,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.5),
-                          ),
-                        ),
-                      ),
-                      // Main Content
-                      Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          children: [
-                            // Enhanced Profile Avatar with pulse animation
-                            Container(
-                              width: 110,
-                              height: 110,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.white.withOpacity(0.95),
-                                    Colors.white.withOpacity(0.8),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(55),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.15),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                  BoxShadow(
-                                    color: Colors.white.withOpacity(0.8),
-                                    blurRadius: 15,
-                                    offset: const Offset(-5, -5),
-                                  ),
-                                ],
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.4),
-                                  width: 3,
-                                ),
-                              ),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(55),
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      const Color(0xFF667EEA).withOpacity(0.1),
-                                      const Color(0xFF764BA2).withOpacity(0.1),
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                ),
-                                child: Icon(
-                                  Icons.person,
-                                  size: 55,
-                                  color: const Color(0xFF667EEA),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            // User Name with enhanced styling
-                            Text(
-                              widget.name,
-                              style: const TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                letterSpacing: -0.8,
-                                height: 1.1,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black26,
-                                    offset: Offset(0, 3),
-                                    blurRadius: 6,
-                                  ),
-                                ],
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 12),
-                            // Enhanced User Email with better design
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.white.withOpacity(0.25),
-                                    Colors.white.withOpacity(0.15),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(25),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.4),
-                                  width: 1.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Icon(
-                                      Icons.email_outlined,
-                                      size: 18,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Flexible(
-                                    child: Text(
-                                      widget.email,
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                        shadows: [
-                                          Shadow(
-                                            color: Colors.black26,
-                                            offset: Offset(0, 1),
-                                            blurRadius: 2,
-                                          ),
-                                        ],
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+                );
+              },
             ),
-
-            const SizedBox(height: 35),
-
-            // Enhanced Profile Details Section
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 25,
-                    offset: const Offset(0, 8),
-                    spreadRadius: 2,
+          ),
+          Positioned(
+            top: 50,
+            right: -150,
+            child: TweenAnimationBuilder(
+              tween: Tween<double>(begin: 0, end: 1),
+              duration: const Duration(seconds: 4),
+              builder: (context, double value, child) {
+                return Transform.translate(
+                  offset: Offset(value * -30, value * 30),
+                  child: Container(
+                    width: 350,
+                    height: 350,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          const Color(0xFF38BDF8).withOpacity(0.15),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
                   ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-                border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                );
+              },
+            ),
+          ),
+
+          // Main Content & Glassscape UI
+          SafeArea(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+              child: Column(
+                children: [
+                  const SizedBox(height: 20),
+                  // Morphing Profile Hero
+                  _buildAnimatedSection(
+                    delay: 200,
+                    child: Column(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                const Color(0xFF667EEA).withOpacity(0.1),
-                                const Color(0xFF764BA2).withOpacity(0.1),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
+                            shape: BoxShape.circle,
                             border: Border.all(
-                              color: const Color(0xFF667EEA).withOpacity(0.2),
-                              width: 1,
+                              color: Colors.white.withOpacity(0.8),
+                              width: 2,
                             ),
-                          ),
-                          child: Icon(
-                            Icons.info_outline,
-                            color: const Color(0xFF667EEA),
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Profile Information',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF1A202C),
-                                  letterSpacing: -0.3,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Manage your account details',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade600,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF818CF8,
+                                ).withOpacity(0.25),
+                                blurRadius: 40,
+                                spreadRadius: -5,
                               ),
                             ],
+                          ),
+                          child: CircleAvatar(
+                            radius: 60,
+                            backgroundColor: Colors.white,
+                            child: Text(
+                              widget.name.isNotEmpty
+                                  ? widget.name[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                fontSize: 48,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          widget.name,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1E293B),
+                            letterSpacing: -1,
+                            height: 1.2,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.8),
+                            ),
+                          ),
+                          child: Text(
+                            widget.email,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 28),
-
-                    // Enhanced Information Tiles
-                    _buildEnhancedInfoTile(
-                      icon: Icons.person_outline,
-                      title: 'Full Name',
-                      value: widget.name,
-                      iconColor: const Color(0xFF667EEA),
-                      subtitle: 'Your display name',
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    _buildEnhancedInfoTile(
-                      icon: Icons.email_outlined,
-                      title: 'Email Address',
-                      value: widget.email,
-                      iconColor: const Color(0xFF48BB78),
-                      subtitle: 'Your primary email',
-                    ),
-
-                   
-
-                    
-
-                    const SizedBox(height: 10),
-
-                    // _buildEnhancedInfoTile(
-                    //   icon: Icons.badge_outlined,
-                    //   title: 'Account Type',
-                    //   value: 'Student Account',
-                    //   iconColor: const Color(0xFFED8936),
-                    //   subtitle: 'Active membership',
-                    // ),
-
-                    // const SizedBox(height: 20),
-
-                    // _buildEnhancedInfoTile(
-                    //   icon: Icons.access_time_outlined,
-                    //   title: 'Member Since',
-                    //   value: 'Academic Year 2024-25',
-                    //   iconColor: const Color(0xFF9F7AEA),
-                    //   subtitle: 'Account creation',
-                    // ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 25),
-
-            // Quick Actions Section
-            
-
-            const SizedBox(height: 35),
-
-            // Enhanced Logout Button
-            Container(
-              width: double.infinity,
-              height: 60,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFEF4444).withOpacity(0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                    spreadRadius: 2,
                   ),
-                ],
-              ),
-              child:
-                  _isLoggingOut
-                      ? Container(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
+
+                  const SizedBox(height: 40),
+
+                  // Floating Stats Island
+                  _buildAnimatedSection(
+                    delay: 400,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 24,
+                        horizontal: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.8),
+                          width: 1.5,
                         ),
-                        child: const Center(
-                          child: SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 3,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF64748B).withOpacity(0.08),
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildStatItem(
+                            label: 'Dept',
+                            value: widget.department,
+                            color: const Color(0xFF6366F1), // Indigo
+                            icon: Icons.school_rounded,
+                          ),
+                          Container(
+                            height: 40,
+                            width: 1,
+                            color: const Color(0xFFE2E8F0),
+                          ),
+                          _buildStatItem(
+                            label: 'Year',
+                            value: widget.year,
+                            color: const Color(0xFFEC4899), // Pink
+                            icon: Icons.calendar_today_rounded,
+                          ),
+                          Container(
+                            height: 40,
+                            width: 1,
+                            color: const Color(0xFFE2E8F0),
+                          ),
+                          _buildStatItem(
+                            label: 'Section',
+                            value: widget.section,
+                            color: const Color(0xFF10B981), // Emerald
+                            icon: Icons.class_rounded,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  // Details Section
+                  _buildAnimatedSection(
+                    delay: 600,
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.8),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF64748B).withOpacity(0.08),
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Account Details',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF334155),
+                              letterSpacing: -0.5,
                             ),
                           ),
+                          const SizedBox(height: 10),
+                          _buildDetailRow(
+                            icon: Icons.badge_outlined,
+                            label: 'Role',
+                            value: 'Student',
+                          ),
+                          _buildDetailRow(
+                            icon: Icons.verified_user_outlined,
+                            label: 'Status',
+                            value: 'Active',
+                            isLast: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 40),
+
+                  // Logout Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _isLoggingOut ? null : _logout,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFFEF4444),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: const BorderSide(
+                            color: Color(0xFFFEE2E2),
+                            width: 1,
+                          ),
                         ),
-                      )
-                      : Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _logout,
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.2),
-                                width: 1,
-                              ),
-                            ),
-                            child: const Center(
-                              child: Row(
+                        padding: EdgeInsets.zero,
+                      ),
+                      child:
+                          _isLoggingOut
+                              ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Color(0xFFEF4444),
+                                  ),
+                                ),
+                              )
+                              : const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(
-                                    Icons.logout_rounded,
-                                    color: Colors.white,
-                                    size: 22,
-                                  ),
-                                  SizedBox(width: 12),
+                                  Icon(Icons.logout_rounded, size: 20),
+                                  SizedBox(width: 8),
                                   Text(
-                                    'Logout',
+                                    'Sign Out',
                                     style: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
                                       letterSpacing: 0.3,
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ),
-                        ),
-                      ),
-            ),
+                    ),
+                  ),
 
-            const SizedBox(height: 30),
-          ],
-        ),
-      ),
-    );
-  }
+                  const SizedBox(height: 20),
 
-  // Enhanced Info Tile Widget
-  Widget _buildEnhancedInfoTile({
-    required IconData icon,
-    required String title,
-    required String value,
-    required Color iconColor,
-    required String subtitle,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [const Color(0xFFF8FAFC), Colors.white],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  iconColor.withOpacity(0.15),
-                  iconColor.withOpacity(0.1),
+                  Text(
+                    'Attendanzy v1.0.0',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.withOpacity(0.5),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: iconColor.withOpacity(0.2), width: 1),
             ),
-            child: Icon(icon, color: iconColor, size: 24),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1E293B),
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade500,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.arrow_forward_ios, size: 14, color: iconColor),
           ),
         ],
       ),
     );
   }
 
-  // Action Button Widget
-  Widget _buildActionButton({
-    required IconData icon,
-    required String title,
+  // Animation Wrapper
+  Widget _buildAnimatedSection({required int delay, required Widget child}) {
+    return TweenAnimationBuilder(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 800),
+      curve: Curves.easeOutQuart,
+      builder: (context, double value, _) {
+        return Transform.translate(
+          offset: Offset(0, 30 * (1 - value)),
+          child: Opacity(opacity: value, child: child),
+        );
+      },
+    );
+  }
+
+  // Stats Island Item
+  Widget _buildStatItem({
+    required String label,
+    required String value,
     required Color color,
-    required VoidCallback onTap,
+    required IconData icon,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(18),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withOpacity(0.2), width: 1.5),
+            color: color.withOpacity(0.1),
+            shape: BoxShape.circle,
+            border: Border.all(color: color.withOpacity(0.2), width: 1),
           ),
-          child: Column(
+          child: Icon(icon, color: color, size: 22),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF1E293B),
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: const Color(0xFF64748B),
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Premium Detail Row
+  Widget _buildDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    bool isLast = false,
+  }) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
+                  color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: color, size: 24),
+                child: Icon(icon, size: 20, color: const Color(0xFF64748B)),
               ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: color,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFF1E293B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
         ),
-      ),
+        if (!isLast)
+          Divider(height: 1, color: const Color(0xFFE2E8F0).withOpacity(0.5)),
+      ],
     );
   }
 }

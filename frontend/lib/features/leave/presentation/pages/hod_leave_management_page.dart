@@ -158,10 +158,10 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
         return status == 'pending' || status == 'pending_hod' || status == '';
       }).length;
 
-  int get _approvedCount =>
+  int get _acceptedCount =>
       requests.where((r) {
         final status = (r['status'] ?? '').toString().toLowerCase();
-        return status == 'approved';
+        return status == 'accepted';
       }).length;
 
   int get _rejectedCount =>
@@ -195,7 +195,7 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'approved':
+      case 'accepted':
         return const Color(0xFF10B981);
       case 'rejected':
         return const Color(0xFFEF4444);
@@ -208,7 +208,7 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
 
   Color _getStatusBackgroundColor(String status) {
     switch (status.toLowerCase()) {
-      case 'approved':
+      case 'accepted':
         return const Color(0xFFD1FAE5);
       case 'rejected':
         return const Color(0xFFFEE2E2);
@@ -221,7 +221,7 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
 
   IconData _getStatusIcon(String status) {
     switch (status.toLowerCase()) {
-      case 'approved':
+      case 'accepted':
         return Icons.check_circle;
       case 'rejected':
         return Icons.cancel;
@@ -343,9 +343,9 @@ class _HodLeaveManagementPageState extends State<HodLeaveManagementPage> {
 
     return MacFolderFullPage(
       title: 'Leave Requests - ${hodDepartment ?? "Department"}',
-      acceptedLabel: 'Approved',
+      acceptedLabel: 'Accepted',
       pendingCount: _pendingCount,
-      acceptedCount: _approvedCount,
+      acceptedCount: _acceptedCount,
       rejectedCount: _rejectedCount,
       allRequests: requests,
       requestCardBuilder: _buildLeaveRequestCard,
