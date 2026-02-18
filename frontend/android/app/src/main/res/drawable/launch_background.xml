@@ -1,9 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Enhanced native splash screen layout.
+     Layer 1: Radial gradient background (white → light blue)
+     Layer 2: App icon, centered with inset for elegant proportions -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
-        <bitmap android:gravity="fill" android:src="@drawable/background"/>
-    </item>
-    <item>
-        <bitmap android:gravity="center" android:src="@drawable/splash"/>
+    <!-- Gradient background -->
+    <item android:drawable="@drawable/splash_background"/>
+
+    <!-- App icon: centered, with inset so it appears at ~40% of screen width -->
+    <item
+        android:top="30%"
+        android:bottom="30%"
+        android:left="30%"
+        android:right="30%">
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/splash"/>
     </item>
 </layer-list>

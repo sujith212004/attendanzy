@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Centered bitmap drawable for use as the adaptive icon foreground.
+     gravity="center" ensures the icon is always centered within the canvas. -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:gravity="center"
+    android:src="@drawable/splash"
+    android:tileMode="disabled" />

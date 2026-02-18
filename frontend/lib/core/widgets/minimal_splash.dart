@@ -447,7 +447,6 @@ class _KineticConnectivityPainter extends CustomPainter {
       // Draw Kinetic Data Trail
       if (progress > 0.4) {
         final dataT = (rotation * 3 + i * 0.4) % 1.0; // Loop 0-1
-        final pos = Offset.lerp(center, endPoint, dataT)!;
 
         // Trail Effect
         for (int j = 0; j < 5; j++) {

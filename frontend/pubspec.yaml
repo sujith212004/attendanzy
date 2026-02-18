@@ -153,14 +153,19 @@ flutter:
   # see https://flutter.dev/to/font-from-package
 
 flutter_native_splash:
-  color: "#E3F2FD"  # Light blue background
-  image: "assets/image/icon.png"
+  # White background for the entire splash screen
+  color: "#FFFFFF"
+  # Main image shown on older Android and iOS
+  image: "assets/icon/icon.png"
   android: true
   ios: true
   web: false
 
+  # Android 12+ uses an adaptive icon format.
+  # The icon is always shown inside a circle by the OS.
+  # Setting icon_background_color to white makes the circle invisible.
   android_12:
     color: "#FFFFFF"
-    image: "assets/image/logo2.jpg"
-    branding: "assets/image/branding.png" # Light blue background for Android 12+
-
+    image: "assets/icon/icon.png"
+    icon_background_color: "#FFFFFF"
+    # image_dark: "assets/icon/icon.png"
