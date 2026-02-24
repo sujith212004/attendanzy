@@ -355,39 +355,66 @@ exports.updateHODStatus = async (req, res) => {
 
             // Generate PDF
             const pdfPath = path.join(lettersDir, `${leaveId}.pdf`);
+            // PDF Design System
+            const accentColor = '#2ecc71';
+            const textColor = '#1F2937';
+
             const doc = new PDFDocument({ margin: 50 });
             const stream = fs.createWriteStream(pdfPath);
             doc.pipe(stream);
 
-            // Title
-            doc.fillColor('#1a1a1a').fontSize(22).text("ATTENDANZY LEAVE APPROVAL", { align: 'center' });
-            doc.moveDown();
-            doc.strokeColor('#333').lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+            // Header
+            doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(24).text('ATTENDANZY', { align: 'center', wordSpacing: 5 });
+            doc.fillColor(textColor).font('Helvetica').fontSize(14).text('OFFICIAL LEAVE APPROVAL', { align: 'center' });
+            doc.moveDown(1);
+            doc.strokeColor('#EEEEEE').lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
             doc.moveDown(1.5);
 
-            // Content
-            doc.fillColor('#333').fontSize(12);
-            const leftX = 70;
-            const labelWidth = 120;
+            // Certificate of Authenticity Ribbon
+            doc.rect(50, doc.y, 500, 25).fill('#F3F4F6');
+            doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('OFFICIAL DOCUMENT • PROTECTED BY SECURE VERIFICATION', 60, doc.y + 7, { align: 'center' });
+            doc.moveDown(2);
+
+            // Student Info Table Style
+            doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('STUDENT INFORMATION', { characterSpacing: 1 });
+            doc.moveDown(0.5);
+
+            const infoY = doc.y;
+            doc.fillColor(textColor).font('Helvetica');
+            doc.text('Name:', 50, infoY);
+            doc.font('Helvetica-Bold').text(leaveRequest.studentName, 150, infoY);
+
+            doc.font('Helvetica').text('Email:', 50, infoY + 20);
+            doc.text(leaveRequest.studentEmail, 150, infoY + 20);
+
+            doc.text('Dept/Year:', 50, infoY + 40);
+            doc.text(`${leaveRequest.department} - ${leaveRequest.year} Year (${leaveRequest.section})`, 150, infoY + 40);
+            doc.moveDown(3);
+
+            // Leave Details
+            doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('LEAVE DETAILS', { characterSpacing: 1 });
+            doc.moveDown(0.5);
+
+            const detailY = doc.y;
+            doc.fillColor(textColor).font('Helvetica');
+            doc.text('Subject:', 50, detailY);
+            doc.text(leaveRequest.subject, 150, detailY, { width: 400 });
+
+            doc.text('Duration:', 50, detailY + 20);
+            doc.text(`${leaveRequest.fromDate} to ${leaveRequest.toDate} (${leaveRequest.duration} Day[s])`, 150, detailY + 20);
+
+            doc.text('Reason:', 50, detailY + 40);
+            doc.text(leaveRequest.reason || leaveRequest.content, 150, detailY + 40, { width: 400 });
+            doc.moveDown(4);
+
+            const leftX = 70; // Re-define for consistency with addField
+            const labelWidth = 120; // Re-define for consistency with addField
 
             const addField = (label, value) => {
                 doc.font('Helvetica-Bold').text(`${label}:`, leftX, doc.y, { continued: true });
                 doc.font('Helvetica').text(` ${value}`, leftX + labelWidth);
                 doc.moveDown(0.5);
             };
-
-            addField("Student Name", leaveRequest.studentName);
-            addField("Register No", leaveRequest.studentEmail.split('@')[0].toUpperCase());
-            addField("Department", `${leaveRequest.department} (${leaveRequest.year} Year, Sec ${leaveRequest.section})`);
-            addField("Leave Type", leaveRequest.leaveType);
-            addField("From Date", leaveRequest.fromDate);
-            addField("To Date", leaveRequest.toDate);
-            addField("Duration", `${leaveRequest.duration} Day(s)`);
-            doc.moveDown();
-
-            doc.font('Helvetica-Bold').text("Reason:", leftX);
-            doc.font('Helvetica').text(leaveRequest.reason || leaveRequest.content, leftX + 10, doc.y, { width: 450, align: 'justify' });
-            doc.moveDown();
 
             addField("Status", "APPROVED (DIGITALLY VERIFIED)");
             addField("Approved By", `${leaveRequest.forwardedBy} (Incharge: ${leaveRequest.forwardedByIncharge})`);
@@ -683,13 +710,22 @@ exports.verifyLeave = async (req, res) => {
 // Download Leave PDF
 exports.downloadLeavePDF = async (req, res) => {
     try {
-        const { id } = req.params;
+        let { id } = req.params;
+
+        // Harden: Sanitize ID if it contains MongoDB wrappers like ObjectId("hex")
+        if (id && id.includes('ObjectId("')) {
+            const match = id.match(/ObjectId\("([0-9a-fA-F]+)"\)/);
+            if (match) id = match[1];
+        } else if (id && id.startsWith('"') && id.endsWith('"')) {
+            id = id.slice(1, -1);
+        }
+
         const leave = await LeaveRequest.findById(id);
 
         if (!leave || !leave.leaveId) {
             return res.status(404).json({
                 success: false,
-                message: 'Leave PDF not found or not yet generated',
+                message: `Leave PDF not found or not yet generated for ID: ${id}`,
             });
         }
 

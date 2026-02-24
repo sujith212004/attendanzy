@@ -354,27 +354,27 @@ exports.updateHODStatus = async (req, res) => {
             const textColor = '#1F2937';
 
             // Header
-            doc.fillColor(accentColor).fontSize(24).text('ATTENDANZY', { align: 'center', wordSpacing: 5 });
-            doc.fillColor(textColor).fontSize(14).text('SECURE ON-DUTY (OD) APPROVAL', { align: 'center' });
+            doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(24).text('ATTENDANZY', { align: 'center', wordSpacing: 5 });
+            doc.fillColor(textColor).font('Helvetica').fontSize(14).text('SECURE ON-DUTY (OD) APPROVAL', { align: 'center' });
             doc.moveDown(1);
             doc.strokeColor('#EEEEEE').lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
             doc.moveDown(1.5);
 
             // Certificate of Authenticity Ribbon
             doc.rect(50, doc.y, 500, 25).fill('#F3F4F6');
-            doc.fillColor('#4B5563').fontSize(10).text('OFFICIAL DOCUMENT • PROTECTED BY BLOCKCHAIN-INSPIRED VERIFICATION', 60, doc.y + 7, { align: 'center' });
+            doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('OFFICIAL DOCUMENT • PROTECTED BY SECURE VERIFICATION', 60, doc.y + 7, { align: 'center' });
             doc.moveDown(2);
 
             // Student Info Table Style
-            doc.fillColor(accentColor).fontSize(12).text('STUDENT INFORMATION', { characterSpacing: 1 });
+            doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('STUDENT INFORMATION', { characterSpacing: 1 });
             doc.moveDown(0.5);
 
             const infoY = doc.y;
-            doc.fillColor(textColor).fontSize(10);
+            doc.fillColor(textColor).font('Helvetica');
             doc.text('Name:', 50, infoY);
-            doc.text(odRequest.studentName, 150, infoY, { bold: true });
+            doc.font('Helvetica-Bold').text(odRequest.studentName, 150, infoY);
 
-            doc.text('Email:', 50, infoY + 20);
+            doc.font('Helvetica').text('Email:', 50, infoY + 20);
             doc.text(odRequest.studentEmail, 150, infoY + 20);
 
             doc.text('Dept/Year:', 50, infoY + 40);
@@ -382,11 +382,11 @@ exports.updateHODStatus = async (req, res) => {
             doc.moveDown(3);
 
             // OD Details
-            doc.fillColor(accentColor).fontSize(12).text('OD DETAILS', { characterSpacing: 1 });
+            doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('OD DETAILS', { characterSpacing: 1 });
             doc.moveDown(0.5);
 
             const detailY = doc.y;
-            doc.fillColor(textColor).fontSize(10);
+            doc.fillColor(textColor).font('Helvetica');
             doc.text('Subject:', 50, detailY);
             doc.text(odRequest.subject, 150, detailY, { width: 400 });
 
@@ -689,13 +689,22 @@ exports.verifyOD = async (req, res) => {
 // Download OD PDF
 exports.downloadODPDF = async (req, res) => {
     try {
-        const { id } = req.params;
+        let { id } = req.params;
+
+        // Harden: Sanitize ID if it contains MongoDB wrappers like ObjectId("hex")
+        if (id && id.includes('ObjectId("')) {
+            const match = id.match(/ObjectId\("([0-9a-fA-F]+)"\)/);
+            if (match) id = match[1];
+        } else if (id && id.startsWith('"') && id.endsWith('"')) {
+            id = id.slice(1, -1);
+        }
+
         const od = await ODRequest.findById(id);
 
         if (!od || !od.odId) {
             return res.status(404).json({
                 success: false,
-                message: 'OD PDF not found or not yet generated',
+                message: `OD PDF not found or not yet generated for ID: ${id}`,
             });
         }
 
