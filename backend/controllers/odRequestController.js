@@ -315,10 +315,12 @@ exports.updateHODStatus = async (req, res) => {
         odRequest.hodStatus = status;
         if (remarks) odRequest.hodRemarks = remarks;
 
-        // Update overall status
-        if (status === 'approved') {
+        // Update overall status - Treat 'approved' or 'accepted' as approval
+        const isApproved = status && (status.toLowerCase() === 'approved' || status.toLowerCase() === 'accepted');
+
+        if (isApproved) {
             odRequest.status = 'accepted';
-            console.log(`✅ Setting overall status to 'accepted'`);
+            console.log(`✅ Setting overall status to 'accepted' (from HOD status: ${status})`);
 
             // Generate Secure OD ID and PDF
             const timestamp = new Date();
@@ -333,9 +335,12 @@ exports.updateHODStatus = async (req, res) => {
             const verificationUrl = `${baseUrl}/api/od-requests/verify/${odId}`;
             odRequest.verificationUrl = verificationUrl;
 
-            // Generate QR Code as Base64
+            // Generate QR Code as Buffer (safer for PDFKit)
             console.log(`Generating QR Code for: ${verificationUrl}`);
-            const qrImage = await QRCode.toDataURL(verificationUrl);
+            const qrBuffer = await QRCode.toBuffer(verificationUrl, {
+                margin: 1,
+                width: 200
+            });
 
             // Create Letter Directory if not exists
             const lettersDir = path.join(__dirname, '../letters');
@@ -399,7 +404,11 @@ exports.updateHODStatus = async (req, res) => {
 
             // Verification Section (QR and Text)
             const qrY = doc.y;
-            doc.image(qrImage, 400, qrY - 20, { width: 120 });
+            try {
+                doc.image(qrBuffer, 400, qrY - 20, { width: 120 });
+            } catch (imgError) {
+                console.error('QR Image error:', imgError);
+            }
 
             doc.fillColor(accentColor).fontSize(12).text('APPROVAL STATUS: VERIFIED', 50, qrY);
             doc.fillColor('#059669').fontSize(10).text('Approved by Head of Department (HOD)', 50, qrY + 20);
@@ -420,9 +429,11 @@ exports.updateHODStatus = async (req, res) => {
 
             odRequest.pdfUrl = `${baseUrl}/api/od-requests/${odRequest._id}/download`;
 
-        } else {
+        } else if (status && status.toLowerCase() === 'rejected') {
             odRequest.status = 'rejected';
             console.log(`❌ Setting overall status to 'rejected'`);
+        } else {
+            console.log(`ℹ️ Status updated to '${status}', no overall status change or PDF generation triggered.`);
         }
 
         await odRequest.save();
@@ -701,10 +712,17 @@ exports.downloadODPDF = async (req, res) => {
 
         const od = await ODRequest.findById(id);
 
-        if (!od || !od.odId) {
+        if (!od) {
             return res.status(404).json({
                 success: false,
-                message: `OD PDF not found or not yet generated for ID: ${id}`,
+                message: `OD request record not found for database ID: ${id}`,
+            });
+        }
+
+        if (!od.odId) {
+            return res.status(404).json({
+                success: false,
+                message: `OD PDF not yet generated for this request. Status is: ${od.status}. Secure ID (odId) is missing.`,
             });
         }
 
