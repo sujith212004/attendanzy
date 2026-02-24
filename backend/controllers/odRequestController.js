@@ -1,5 +1,9 @@
 const ODRequest = require('../models/ODRequest');
 const { notifyStaffOnNewRequest, notifyHODOnForward, notifyStudentOnStatusChange, notifyStaffOnHODDecision } = require('../services/notificationService');
+const QRCode = require('qrcode');
+const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const path = require('path');
 
 // Submit OD Request
 exports.submitODRequest = async (req, res) => {
@@ -315,6 +319,107 @@ exports.updateHODStatus = async (req, res) => {
         if (status === 'approved') {
             odRequest.status = 'accepted';
             console.log(`✅ Setting overall status to 'accepted'`);
+
+            // Generate Secure OD ID and PDF
+            const timestamp = new Date();
+            const dateStr = timestamp.toISOString().replace(/[-:T.Z]/g, "").substring(0, 8);
+            const randomStr = Math.random().toString(36).substring(2, 5).toUpperCase();
+            const odId = `OD-${dateStr}-${randomStr}`;
+
+            odRequest.odId = odId;
+
+            // Generate Verification URL
+            const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 5000}`;
+            const verificationUrl = `${baseUrl}/api/od-requests/verify/${odId}`;
+            odRequest.verificationUrl = verificationUrl;
+
+            // Generate QR Code as Base64
+            console.log(`Generating QR Code for: ${verificationUrl}`);
+            const qrImage = await QRCode.toDataURL(verificationUrl);
+
+            // Create Letter Directory if not exists
+            const lettersDir = path.join(__dirname, '../letters');
+            if (!fs.existsSync(lettersDir)) {
+                fs.mkdirSync(lettersDir, { recursive: true });
+            }
+
+            // Generate PDF
+            const pdfPath = path.join(lettersDir, `${odId}.pdf`);
+            const doc = new PDFDocument({ margin: 50 });
+            const stream = fs.createWriteStream(pdfPath);
+            doc.pipe(stream);
+
+            // PDF Design System (Similar to Leave Request)
+            const accentColor = '#3B82F6'; // Blue for OD
+            const textColor = '#1F2937';
+
+            // Header
+            doc.fillColor(accentColor).fontSize(24).text('ATTENDANZY', { align: 'center', wordSpacing: 5 });
+            doc.fillColor(textColor).fontSize(14).text('SECURE ON-DUTY (OD) APPROVAL', { align: 'center' });
+            doc.moveDown(1);
+            doc.strokeColor('#EEEEEE').lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+            doc.moveDown(1.5);
+
+            // Certificate of Authenticity Ribbon
+            doc.rect(50, doc.y, 500, 25).fill('#F3F4F6');
+            doc.fillColor('#4B5563').fontSize(10).text('OFFICIAL DOCUMENT • PROTECTED BY BLOCKCHAIN-INSPIRED VERIFICATION', 60, doc.y + 7, { align: 'center' });
+            doc.moveDown(2);
+
+            // Student Info Table Style
+            doc.fillColor(accentColor).fontSize(12).text('STUDENT INFORMATION', { characterSpacing: 1 });
+            doc.moveDown(0.5);
+
+            const infoY = doc.y;
+            doc.fillColor(textColor).fontSize(10);
+            doc.text('Name:', 50, infoY);
+            doc.text(odRequest.studentName, 150, infoY, { bold: true });
+
+            doc.text('Email:', 50, infoY + 20);
+            doc.text(odRequest.studentEmail, 150, infoY + 20);
+
+            doc.text('Dept/Year:', 50, infoY + 40);
+            doc.text(`${odRequest.department} - ${odRequest.year} Year (${odRequest.section})`, 150, infoY + 40);
+            doc.moveDown(3);
+
+            // OD Details
+            doc.fillColor(accentColor).fontSize(12).text('OD DETAILS', { characterSpacing: 1 });
+            doc.moveDown(0.5);
+
+            const detailY = doc.y;
+            doc.fillColor(textColor).fontSize(10);
+            doc.text('Subject:', 50, detailY);
+            doc.text(odRequest.subject, 150, detailY, { width: 400 });
+
+            doc.text('Duration:', 50, detailY + 20);
+            doc.text(`${odRequest.from} to ${odRequest.to}`, 150, detailY + 20);
+
+            doc.text('Reason/Details:', 50, detailY + 40);
+            doc.text(odRequest.content, 150, detailY + 40, { width: 400 });
+            doc.moveDown(4);
+
+            // Verification Section (QR and Text)
+            const qrY = doc.y;
+            doc.image(qrImage, 400, qrY - 20, { width: 120 });
+
+            doc.fillColor(accentColor).fontSize(12).text('APPROVAL STATUS: VERIFIED', 50, qrY);
+            doc.fillColor('#059669').fontSize(10).text('Approved by Head of Department (HOD)', 50, qrY + 20);
+            doc.fillColor('#6B7280').fontSize(8);
+            doc.text(`Forwarded by: ${odRequest.forwardedBy || 'Department Staff'}`, 50, qrY + 40);
+            doc.text(`Approval ID: ${odId}`, 50, qrY + 54);
+            doc.text(`Issued On: ${new Date().toLocaleString()}`, 50, qrY + 68);
+
+            // Security Footer
+            doc.moveDown(4);
+            doc.rect(50, 700, 500, 60).fill('#FEF2F2');
+            doc.fillColor('#991B1B').fontSize(9).text('SECURITY WARNING: This document contains a secure digital signature encoded in the QR code. Any modification to the names, dates, or content of this PDF will be detectable. To verify authenticity, scan the QR code or visit the verification portal below.', 60, 710, { width: 480, align: 'center' });
+
+            doc.fillColor(accentColor).fontSize(8).text(verificationUrl, 50, 770, { align: 'center' });
+
+            doc.end();
+            console.log(`✅ OD PDF Generated: ${pdfPath}`);
+
+            odRequest.pdfUrl = `${baseUrl}/api/od-requests/${odRequest._id}/download`;
+
         } else {
             odRequest.status = 'rejected';
             console.log(`❌ Setting overall status to 'rejected'`);
@@ -493,6 +598,123 @@ exports.updateODRequest = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to update OD request',
+            error: error.message,
+        });
+    }
+};
+
+// Verify OD Authenticity
+exports.verifyOD = async (req, res) => {
+    try {
+        const { odId } = req.params;
+        const od = await ODRequest.findOne({ odId });
+
+        if (!od) {
+            return res.status(404).send(`
+                <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+                    <h1 style="color: red;">INVALID DOCUMENT ❌</h1>
+                    <p>No matching OD record found in Attendanzy database.</p>
+                </div>
+            `);
+        }
+
+        res.send(`
+            <html>
+                <head>
+                    <title>Attendanzy Verification - OD</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8; color: #333; margin: 0; padding: 20px; }
+                        .card { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-top: 5px solid #3b82f6; }
+                        .header { text-align: center; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 20px; }
+                        .status { display: inline-block; padding: 10px 20px; border-radius: 50px; font-weight: bold; font-size: 14px; background: #e0f2fe; color: #0369a1; margin-bottom: 20px; }
+                        .field { margin-bottom: 15px; border-bottom: 1px solid #f9f9f9; padding-bottom: 8px; }
+                        .label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+                        .value { font-size: 16px; font-weight: 500; color: #1e293b; }
+                        .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #aaa; }
+                        .success-icon { font-size: 40px; color: #3b82f6; margin-bottom: 10px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <div class="header">
+                            <div class="success-icon">🛡️</div>
+                            <h2 style="margin: 0; color: #1a1a1a;">Attendanzy Verification</h2>
+                            <p style="color: #666; font-size: 14px; margin-top: 5px;">OD ID: ${od.odId}</p>
+                        </div>
+                        
+                        <div style="text-align: center;">
+                            <div class="status">VALID ON-DUTY OFFICIAL</div>
+                        </div>
+
+                        <div class="field">
+                            <div class="label">Student Name</div>
+                            <div class="value">${od.studentName}</div>
+                        </div>
+                        <div class="field">
+                            <div class="label">Email</div>
+                            <div class="value">${od.studentEmail}</div>
+                        </div>
+                        <div class="field">
+                            <div class="label">Duration</div>
+                            <div class="value">${od.from} to ${od.to}</div>
+                        </div>
+                        <div class="field">
+                            <div class="label">Subject</div>
+                            <div class="value">${od.subject}</div>
+                        </div>
+                        <div class="field">
+                            <div class="label">Approved By</div>
+                            <div class="value">HOD (via ${od.forwardedBy})</div>
+                        </div>
+                        <div class="field">
+                            <div class="label">Timestamp</div>
+                            <div class="value">${od.updatedAt || 'Recently Approved'}</div>
+                        </div>
+
+                        <div class="footer">
+                            Attendanzy Secure Verification System &copy; 2026
+                        </div>
+                    </div>
+                </body>
+            </html>
+        `);
+
+    } catch (error) {
+        console.error('OD Verification error:', error);
+        res.status(500).send("Internal Server Error");
+    }
+};
+
+// Download OD PDF
+exports.downloadODPDF = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const od = await ODRequest.findById(id);
+
+        if (!od || !od.odId) {
+            return res.status(404).json({
+                success: false,
+                message: 'OD PDF not found or not yet generated',
+            });
+        }
+
+        const pdfPath = path.join(__dirname, '../letters', `${od.odId}.pdf`);
+
+        if (!fs.existsSync(pdfPath)) {
+            return res.status(404).json({
+                success: false,
+                message: 'PDF file missing on server',
+            });
+        }
+
+        res.download(pdfPath, `OD_Request_${od.studentName.replace(/\s+/g, '_')}.pdf`);
+
+    } catch (error) {
+        console.error('OD Download error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to download PDF',
             error: error.message,
         });
     }

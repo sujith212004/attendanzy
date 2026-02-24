@@ -81,6 +81,18 @@ const odRequestSchema = new mongoose.Schema({
     updatedAt: {
         type: String,
     },
+    // Secure verification details
+    odId: {
+        type: String,
+        unique: true,
+        sparse: true,
+    },
+    verificationUrl: {
+        type: String,
+    },
+    pdfUrl: {
+        type: String,
+    },
 }, {
     collection: 'od_requests',
     timestamps: false,

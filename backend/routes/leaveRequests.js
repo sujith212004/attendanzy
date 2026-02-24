@@ -52,4 +52,12 @@ router.delete('/:id', leaveRequestController.deleteLeaveRequest);
 // @access  Public (Student)
 router.put('/:id', leaveRequestController.updateLeaveRequest);
 
+// @route   GET /api/leave-requests/verify/:leaveId
+// @desc    Verify leave authenticity
+router.get('/verify/:leaveId', leaveRequestController.verifyLeave);
+
+// @route   GET /api/leave-requests/:id/download
+// @desc    Download generated PDF
+router.get('/:id/download', leaveRequestController.downloadLeavePDF);
+
 module.exports = router;

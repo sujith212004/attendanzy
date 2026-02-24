@@ -1,5 +1,9 @@
 const LeaveRequest = require('../models/LeaveRequest');
 const { notifyStaffOnNewRequest, notifyHODOnForward, notifyStudentOnStatusChange, notifyStaffOnHODDecision } = require('../services/notificationService');
+const QRCode = require('qrcode');
+const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const path = require('path');
 
 // Submit Leave Request
 exports.submitLeaveRequest = async (req, res) => {
@@ -325,6 +329,90 @@ exports.updateHODStatus = async (req, res) => {
         if (status === 'approved') {
             leaveRequest.status = 'accepted';
             console.log(`✅ Setting overall status to 'accepted'`);
+
+            // Generate Secure Leave ID and PDF
+            const timestamp = new Date();
+            const dateStr = timestamp.toISOString().replace(/[-:T.Z]/g, "").substring(0, 8);
+            const randomStr = Math.random().toString(36).substring(2, 5).toUpperCase();
+            const leaveId = `ATZ-${dateStr}-${randomStr}`;
+
+            leaveRequest.leaveId = leaveId;
+
+            // Generate Verification URL
+            const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 5000}`;
+            const verificationUrl = `${baseUrl}/api/leave-requests/verify/${leaveId}`;
+            leaveRequest.verificationUrl = verificationUrl;
+
+            // Generate QR Code as Base64
+            console.log(`Generating QR Code for: ${verificationUrl}`);
+            const qrImage = await QRCode.toDataURL(verificationUrl);
+
+            // Create Letter Directory if not exists
+            const lettersDir = path.join(__dirname, '../letters');
+            if (!fs.existsSync(lettersDir)) {
+                fs.mkdirSync(lettersDir, { recursive: true });
+            }
+
+            // Generate PDF
+            const pdfPath = path.join(lettersDir, `${leaveId}.pdf`);
+            const doc = new PDFDocument({ margin: 50 });
+            const stream = fs.createWriteStream(pdfPath);
+            doc.pipe(stream);
+
+            // Title
+            doc.fillColor('#1a1a1a').fontSize(22).text("ATTENDANZY LEAVE APPROVAL", { align: 'center' });
+            doc.moveDown();
+            doc.strokeColor('#333').lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+            doc.moveDown(1.5);
+
+            // Content
+            doc.fillColor('#333').fontSize(12);
+            const leftX = 70;
+            const labelWidth = 120;
+
+            const addField = (label, value) => {
+                doc.font('Helvetica-Bold').text(`${label}:`, leftX, doc.y, { continued: true });
+                doc.font('Helvetica').text(` ${value}`, leftX + labelWidth);
+                doc.moveDown(0.5);
+            };
+
+            addField("Student Name", leaveRequest.studentName);
+            addField("Register No", leaveRequest.studentEmail.split('@')[0].toUpperCase());
+            addField("Department", `${leaveRequest.department} (${leaveRequest.year} Year, Sec ${leaveRequest.section})`);
+            addField("Leave Type", leaveRequest.leaveType);
+            addField("From Date", leaveRequest.fromDate);
+            addField("To Date", leaveRequest.toDate);
+            addField("Duration", `${leaveRequest.duration} Day(s)`);
+            doc.moveDown();
+
+            doc.font('Helvetica-Bold').text("Reason:", leftX);
+            doc.font('Helvetica').text(leaveRequest.reason || leaveRequest.content, leftX + 10, doc.y, { width: 450, align: 'justify' });
+            doc.moveDown();
+
+            addField("Status", "APPROVED (DIGITALLY VERIFIED)");
+            addField("Approved By", `${leaveRequest.forwardedBy} (Incharge: ${leaveRequest.forwardedByIncharge})`);
+            addField("Verified By", "HOD");
+            addField("Timestamp", timestamp.toLocaleString());
+
+            doc.moveDown(2);
+
+            // QR Code
+            const qrSize = 120;
+            const centerX = (doc.page.width - qrSize) / 2;
+            doc.image(qrImage, centerX, doc.y, { width: qrSize });
+            doc.moveDown(0.5);
+            doc.fontSize(10).fillColor('#666').text("Scan QR to verify authenticity", { align: 'center' });
+
+            // Footer
+            doc.fontSize(8).fillColor('#999').text(
+                "This document is digitally verified via Attendanzy Secure QR. Any modification invalidates authenticity.",
+                50, 750, { align: 'center', width: 500 }
+            );
+
+            doc.end();
+            console.log(`✅ PDF Generated: ${pdfPath}`);
+
+            leaveRequest.pdfUrl = `${baseUrl}/api/leave-requests/${leaveRequest._id}/download`;
         } else {
             leaveRequest.status = 'rejected';
             console.log(`❌ Setting overall status to 'rejected'`);
@@ -504,6 +592,123 @@ exports.updateLeaveRequest = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to update leave request',
+            error: error.message,
+        });
+    }
+};
+
+// Verify Leave Request
+exports.verifyLeave = async (req, res) => {
+    try {
+        const { leaveId } = req.params;
+        const leave = await LeaveRequest.findOne({ leaveId });
+
+        if (!leave) {
+            return res.status(404).send(`
+                <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+                    <h1 style="color: red;">INVALID DOCUMENT ❌</h1>
+                    <p>No matching leave record found in Attendanzy database.</p>
+                </div>
+            `);
+        }
+
+        res.send(`
+            <html>
+                <head>
+                    <title>Attendanzy Verification</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+                        .card { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+                        .header { text-align: center; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 20px; }
+                        .status { display: inline-block; padding: 10px 20px; border-radius: 50px; font-weight: bold; font-size: 14px; background: #e7f9ed; color: #2ecc71; margin-bottom: 20px; }
+                        .field { margin-bottom: 15px; border-bottom: 1px solid #f9f9f9; padding-bottom: 8px; }
+                        .label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+                        .value { font-size: 16px; font-weight: 500; color: #2c3e50; }
+                        .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #aaa; }
+                        .success-icon { font-size: 40px; color: #2ecc71; margin-bottom: 10px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <div class="header">
+                            <div class="success-icon">✅</div>
+                            <h2 style="margin: 0; color: #1a1a1a;">Attendanzy Verification</h2>
+                            <p style="color: #666; font-size: 14px; margin-top: 5px;">ID: ${leave.leaveId}</p>
+                        </div>
+                        
+                        <div style="text-align: center;">
+                            <div class="status">VALID DOCUMENT OFFICIAL</div>
+                        </div>
+
+                        <div class="field">
+                            <div class="label">Student Name</div>
+                            <div class="value">${leave.studentName}</div>
+                        </div>
+                        <div class="field">
+                            <div class="label">Register No / Email</div>
+                            <div class="value">${leave.studentEmail}</div>
+                        </div>
+                        <div class="field">
+                            <div class="label">Duration</div>
+                            <div class="value">${leave.fromDate} to ${leave.toDate} (${leave.duration} Day[s])</div>
+                        </div>
+                        <div class="field">
+                            <div class="label">Reason</div>
+                            <div class="value">${leave.reason || leave.content}</div>
+                        </div>
+                        <div class="field">
+                            <div class="label">Approved By</div>
+                            <div class="value">HOD (via ${leave.forwardedBy})</div>
+                        </div>
+                        <div class="field">
+                            <div class="label">Verification Timestamp</div>
+                            <div class="value">${leave.updatedAt || 'Recently Approved'}</div>
+                        </div>
+
+                        <div class="footer">
+                            Attendanzy Secure Verification System &copy; 2026
+                        </div>
+                    </div>
+                </body>
+            </html>
+        `);
+
+    } catch (error) {
+        console.error('Verification error:', error);
+        res.status(500).send("Internal Server Error");
+    }
+};
+
+// Download Leave PDF
+exports.downloadLeavePDF = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const leave = await LeaveRequest.findById(id);
+
+        if (!leave || !leave.leaveId) {
+            return res.status(404).json({
+                success: false,
+                message: 'Leave PDF not found or not yet generated',
+            });
+        }
+
+        const pdfPath = path.join(__dirname, '../letters', `${leave.leaveId}.pdf`);
+
+        if (!fs.existsSync(pdfPath)) {
+            return res.status(404).json({
+                success: false,
+                message: 'PDF file missing on server',
+            });
+        }
+
+        res.download(pdfPath, `Leave_${leave.studentName.replace(/\s+/g, '_')}.pdf`);
+
+    } catch (error) {
+        console.error('Download error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to download PDF',
             error: error.message,
         });
     }

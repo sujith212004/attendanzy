@@ -103,6 +103,18 @@ const leaveRequestSchema = new mongoose.Schema({
     updatedAt: {
         type: String,
     },
+    // Secure verification details
+    leaveId: {
+        type: String,
+        unique: true,
+        sparse: true,
+    },
+    verificationUrl: {
+        type: String,
+    },
+    pdfUrl: {
+        type: String,
+    },
 }, {
     collection: 'leave_requests',
     timestamps: false,

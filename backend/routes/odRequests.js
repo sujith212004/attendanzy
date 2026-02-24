@@ -50,6 +50,12 @@ router.delete('/:id', odRequestController.deleteODRequest);
 // @route   PUT /api/od-requests/:id
 // @desc    Update/Edit OD request
 // @access  Public (Student)
-router.put('/:id', odRequestController.updateODRequest);
+// @route   GET /api/od-requests/verify/:odId
+// @desc    Verify OD authenticity
+router.get('/verify/:odId', odRequestController.verifyOD);
+
+// @route   GET /api/od-requests/:id/download
+// @desc    Download generated OD PDF
+router.get('/:id/download', odRequestController.downloadODPDF);
 
 module.exports = router;
