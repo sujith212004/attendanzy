@@ -5,6 +5,127 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 
+/**
+ * Helper to generate Secure OD ID and PDF
+ * @param {Object} odRequest - The OD Request document
+ * @returns {Promise<Object>} - { odId, pdfPath, verificationUrl }
+ */
+const generateODPDFHelper = async (odRequest) => {
+    // Generate Secure OD ID if not exists
+    if (!odRequest.odId) {
+        const timestamp = new Date();
+        const dateStr = timestamp.toISOString().replace(/[-:T.Z]/g, "").substring(0, 8);
+        const randomStr = Math.random().toString(36).substring(2, 5).toUpperCase();
+        odRequest.odId = `OD-${dateStr}-${randomStr}`;
+    }
+
+    const odId = odRequest.odId;
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 5000}`;
+    const verificationUrl = `${baseUrl}/api/od-requests/verify/${odId}`;
+    odRequest.verificationUrl = verificationUrl;
+
+    // Generate QR Code as Buffer (safer for PDFKit)
+    console.log(`Generating QR Code for: ${verificationUrl}`);
+    const qrBuffer = await QRCode.toBuffer(verificationUrl, {
+        margin: 1,
+        width: 200
+    });
+
+    // Create Letter Directory if not exists
+    const lettersDir = path.join(__dirname, '../letters');
+    if (!fs.existsSync(lettersDir)) {
+        fs.mkdirSync(lettersDir, { recursive: true });
+    }
+
+    // Generate PDF
+    const pdfPath = path.join(lettersDir, `${odId}.pdf`);
+    const doc = new PDFDocument({ margin: 50 });
+    const stream = fs.createWriteStream(pdfPath);
+    doc.pipe(stream);
+
+    // PDF Design System (Similar to Leave Request)
+    const accentColor = '#3B82F6'; // Blue for OD
+    const textColor = '#1F2937';
+
+    // Header
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(24).text('ATTENDANZY', { align: 'center', wordSpacing: 5 });
+    doc.fillColor(textColor).font('Helvetica').fontSize(14).text('SECURE ON-DUTY (OD) APPROVAL', { align: 'center' });
+    doc.moveDown(1);
+    doc.strokeColor('#EEEEEE').lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown(1.5);
+
+    // Certificate of Authenticity Ribbon
+    doc.rect(50, doc.y, 500, 25).fill('#F3F4F6');
+    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('OFFICIAL DOCUMENT • PROTECTED BY SECURE VERIFICATION', 60, doc.y + 7, { align: 'center' });
+    doc.moveDown(2);
+
+    // Student Info Table Style
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('STUDENT INFORMATION', { characterSpacing: 1 });
+    doc.moveDown(0.5);
+
+    const infoY = doc.y;
+    doc.fillColor(textColor).font('Helvetica');
+    doc.text('Name:', 50, infoY);
+    doc.font('Helvetica-Bold').text(odRequest.studentName, 150, infoY);
+
+    doc.font('Helvetica').text('Email:', 50, infoY + 20);
+    doc.text(odRequest.studentEmail, 150, infoY + 20);
+
+    doc.text('Dept/Year:', 50, infoY + 40);
+    doc.text(`${odRequest.department} - ${odRequest.year} Year (${odRequest.section})`, 150, infoY + 40);
+    doc.moveDown(3);
+
+    // OD Details
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('OD DETAILS', { characterSpacing: 1 });
+    doc.moveDown(0.5);
+
+    const detailY = doc.y;
+    doc.fillColor(textColor).font('Helvetica');
+    doc.text('Subject:', 50, detailY);
+    doc.text(odRequest.subject, 150, detailY, { width: 400 });
+
+    doc.text('Duration:', 50, detailY + 20);
+    doc.text(`${odRequest.from} to ${odRequest.to}`, 150, detailY + 20);
+
+    doc.text('Reason/Details:', 50, detailY + 40);
+    doc.text(odRequest.content, 150, detailY + 40, { width: 400 });
+    doc.moveDown(4);
+
+    // Verification Section (QR and Text)
+    const qrY = doc.y;
+    try {
+        doc.image(qrBuffer, 400, qrY - 20, { width: 120 });
+    } catch (imgError) {
+        console.error('QR Image error:', imgError);
+    }
+
+    doc.fillColor(accentColor).fontSize(12).text('APPROVAL STATUS: VERIFIED', 50, qrY);
+    doc.fillColor('#059669').fontSize(10).text('Approved by Head of Department (HOD)', 50, qrY + 20);
+    doc.fillColor('#6B7280').fontSize(8);
+    doc.text(`Forwarded by: ${odRequest.forwardedBy || 'Department Staff'}`, 50, qrY + 40);
+    doc.text(`Approval ID: ${odId}`, 50, qrY + 54);
+    doc.text(`Issued On: ${new Date().toLocaleString()}`, 50, qrY + 68);
+
+    // Security Footer
+    doc.moveDown(4);
+    doc.rect(50, 700, 500, 60).fill('#FEF2F2');
+    doc.fillColor('#991B1B').fontSize(9).text('SECURITY WARNING: This document contains a secure digital signature encoded in the QR code. Any modification to the names, dates, or content of this PDF will be detectable. To verify authenticity, scan the QR code or visit the verification portal below.', 60, 710, { width: 480, align: 'center' });
+
+    doc.fillColor(accentColor).fontSize(8).text(verificationUrl, 50, 770, { align: 'center' });
+
+    doc.end();
+
+    return new Promise((resolve, reject) => {
+        stream.on('finish', () => {
+            console.log(`✅ OD PDF Generated: ${pdfPath}`);
+            const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 5000}`;
+            odRequest.pdfUrl = `${baseUrl}/api/od-requests/${odRequest._id}/download`;
+            resolve({ odId, pdfPath, verificationUrl });
+        });
+        stream.on('error', reject);
+    });
+};
+
 // Submit OD Request
 exports.submitODRequest = async (req, res) => {
     try {
@@ -322,113 +443,13 @@ exports.updateHODStatus = async (req, res) => {
             odRequest.status = 'accepted';
             console.log(`✅ Setting overall status to 'accepted' (from HOD status: ${status})`);
 
-            // Generate Secure OD ID and PDF
-            const timestamp = new Date();
-            const dateStr = timestamp.toISOString().replace(/[-:T.Z]/g, "").substring(0, 8);
-            const randomStr = Math.random().toString(36).substring(2, 5).toUpperCase();
-            const odId = `OD-${dateStr}-${randomStr}`;
-
-            odRequest.odId = odId;
-
-            // Generate Verification URL
-            const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 5000}`;
-            const verificationUrl = `${baseUrl}/api/od-requests/verify/${odId}`;
-            odRequest.verificationUrl = verificationUrl;
-
-            // Generate QR Code as Buffer (safer for PDFKit)
-            console.log(`Generating QR Code for: ${verificationUrl}`);
-            const qrBuffer = await QRCode.toBuffer(verificationUrl, {
-                margin: 1,
-                width: 200
-            });
-
-            // Create Letter Directory if not exists
-            const lettersDir = path.join(__dirname, '../letters');
-            if (!fs.existsSync(lettersDir)) {
-                fs.mkdirSync(lettersDir, { recursive: true });
-            }
-
-            // Generate PDF
-            const pdfPath = path.join(lettersDir, `${odId}.pdf`);
-            const doc = new PDFDocument({ margin: 50 });
-            const stream = fs.createWriteStream(pdfPath);
-            doc.pipe(stream);
-
-            // PDF Design System (Similar to Leave Request)
-            const accentColor = '#3B82F6'; // Blue for OD
-            const textColor = '#1F2937';
-
-            // Header
-            doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(24).text('ATTENDANZY', { align: 'center', wordSpacing: 5 });
-            doc.fillColor(textColor).font('Helvetica').fontSize(14).text('SECURE ON-DUTY (OD) APPROVAL', { align: 'center' });
-            doc.moveDown(1);
-            doc.strokeColor('#EEEEEE').lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-            doc.moveDown(1.5);
-
-            // Certificate of Authenticity Ribbon
-            doc.rect(50, doc.y, 500, 25).fill('#F3F4F6');
-            doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('OFFICIAL DOCUMENT • PROTECTED BY SECURE VERIFICATION', 60, doc.y + 7, { align: 'center' });
-            doc.moveDown(2);
-
-            // Student Info Table Style
-            doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('STUDENT INFORMATION', { characterSpacing: 1 });
-            doc.moveDown(0.5);
-
-            const infoY = doc.y;
-            doc.fillColor(textColor).font('Helvetica');
-            doc.text('Name:', 50, infoY);
-            doc.font('Helvetica-Bold').text(odRequest.studentName, 150, infoY);
-
-            doc.font('Helvetica').text('Email:', 50, infoY + 20);
-            doc.text(odRequest.studentEmail, 150, infoY + 20);
-
-            doc.text('Dept/Year:', 50, infoY + 40);
-            doc.text(`${odRequest.department} - ${odRequest.year} Year (${odRequest.section})`, 150, infoY + 40);
-            doc.moveDown(3);
-
-            // OD Details
-            doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('OD DETAILS', { characterSpacing: 1 });
-            doc.moveDown(0.5);
-
-            const detailY = doc.y;
-            doc.fillColor(textColor).font('Helvetica');
-            doc.text('Subject:', 50, detailY);
-            doc.text(odRequest.subject, 150, detailY, { width: 400 });
-
-            doc.text('Duration:', 50, detailY + 20);
-            doc.text(`${odRequest.from} to ${odRequest.to}`, 150, detailY + 20);
-
-            doc.text('Reason/Details:', 50, detailY + 40);
-            doc.text(odRequest.content, 150, detailY + 40, { width: 400 });
-            doc.moveDown(4);
-
-            // Verification Section (QR and Text)
-            const qrY = doc.y;
+            // Use the helper for PDF generation
             try {
-                doc.image(qrBuffer, 400, qrY - 20, { width: 120 });
-            } catch (imgError) {
-                console.error('QR Image error:', imgError);
+                await generateODPDFHelper(odRequest);
+            } catch (pdfError) {
+                console.error('❌ PDF Generation Error:', pdfError);
+                // We still save the approval status even if PDF fails
             }
-
-            doc.fillColor(accentColor).fontSize(12).text('APPROVAL STATUS: VERIFIED', 50, qrY);
-            doc.fillColor('#059669').fontSize(10).text('Approved by Head of Department (HOD)', 50, qrY + 20);
-            doc.fillColor('#6B7280').fontSize(8);
-            doc.text(`Forwarded by: ${odRequest.forwardedBy || 'Department Staff'}`, 50, qrY + 40);
-            doc.text(`Approval ID: ${odId}`, 50, qrY + 54);
-            doc.text(`Issued On: ${new Date().toLocaleString()}`, 50, qrY + 68);
-
-            // Security Footer
-            doc.moveDown(4);
-            doc.rect(50, 700, 500, 60).fill('#FEF2F2');
-            doc.fillColor('#991B1B').fontSize(9).text('SECURITY WARNING: This document contains a secure digital signature encoded in the QR code. Any modification to the names, dates, or content of this PDF will be detectable. To verify authenticity, scan the QR code or visit the verification portal below.', 60, 710, { width: 480, align: 'center' });
-
-            doc.fillColor(accentColor).fontSize(8).text(verificationUrl, 50, 770, { align: 'center' });
-
-            doc.end();
-            console.log(`✅ OD PDF Generated: ${pdfPath}`);
-
-            odRequest.pdfUrl = `${baseUrl}/api/od-requests/${odRequest._id}/download`;
-
         } else if (status && status.toLowerCase() === 'rejected') {
             odRequest.status = 'rejected';
             console.log(`❌ Setting overall status to 'rejected'`);
@@ -720,13 +741,35 @@ exports.downloadODPDF = async (req, res) => {
         }
 
         if (!od.odId) {
-            return res.status(404).json({
-                success: false,
-                message: `OD PDF not yet generated for this request. Status is: ${od.status}. Secure ID (odId) is missing.`,
-            });
+            // Fail-safe: If status is accepted but ID/PDF missing, generate now!
+            if (od.status === 'accepted') {
+                console.log(`⚡ On-the-fly regeneration for OD ${id}`);
+                await generateODPDFHelper(od);
+                await od.save();
+            } else {
+                return res.status(404).json({
+                    success: false,
+                    message: `OD PDF not yet generated for this request. Status is: ${od.status}. Secure ID (odId) is missing.`,
+                });
+            }
         }
 
-        const pdfPath = path.join(__dirname, '../letters', `${od.odId}.pdf`);
+        const lettersDir = path.join(__dirname, '../letters');
+        const pdfPath = path.join(lettersDir, `${od.odId}.pdf`);
+
+        // Fail-safe: If record has ID but file is missing on disk
+        if (!fs.existsSync(pdfPath)) {
+            console.log(`⚡ PDF file missing on disk, regenerating: ${pdfPath}`);
+            await generateODPDFHelper(od);
+            await od.save();
+        }
+
+        if (!fs.existsSync(pdfPath)) {
+            return res.status(404).json({
+                success: false,
+                message: `Failed to generate or find PDF file on server.`,
+            });
+        }
 
         if (!fs.existsSync(pdfPath)) {
             return res.status(404).json({

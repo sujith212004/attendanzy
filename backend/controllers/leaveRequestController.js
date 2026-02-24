@@ -5,6 +5,127 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 
+/**
+ * Helper to generate Secure Leave ID and PDF
+ * @param {Object} leaveRequest - The Leave Request document
+ * @returns {Promise<Object>} - { leaveId, pdfPath, verificationUrl }
+ */
+const generateLeavePDFHelper = async (leaveRequest) => {
+    // Generate Secure Leave ID if not exists
+    if (!leaveRequest.leaveId) {
+        const timestamp = new Date();
+        const dateStr = timestamp.toISOString().replace(/[-:T.Z]/g, "").substring(0, 8);
+        const randomStr = Math.random().toString(36).substring(2, 5).toUpperCase();
+        leaveRequest.leaveId = `ATZ-${dateStr}-${randomStr}`;
+    }
+
+    const leaveId = leaveRequest.leaveId;
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 5000}`;
+    const verificationUrl = `${baseUrl}/api/leave-requests/verify/${leaveId}`;
+    leaveRequest.verificationUrl = verificationUrl;
+
+    // Generate QR Code as Buffer (safer for PDFKit)
+    console.log(`Generating QR Code for: ${verificationUrl}`);
+    const qrBuffer = await QRCode.toBuffer(verificationUrl, {
+        margin: 1,
+        width: 200
+    });
+
+    // Create Letter Directory if not exists
+    const lettersDir = path.join(__dirname, '../letters');
+    if (!fs.existsSync(lettersDir)) {
+        fs.mkdirSync(lettersDir, { recursive: true });
+    }
+
+    // Generate PDF
+    const pdfPath = path.join(lettersDir, `${leaveId}.pdf`);
+    const doc = new PDFDocument({ margin: 50 });
+    const stream = fs.createWriteStream(pdfPath);
+    doc.pipe(stream);
+
+    // PDF Design System
+    const accentColor = '#2ecc71'; // Green for Leave
+    const textColor = '#1F2937';
+
+    // Header
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(24).text('ATTENDANZY', { align: 'center', wordSpacing: 5 });
+    doc.fillColor(textColor).font('Helvetica').fontSize(14).text('OFFICIAL LEAVE APPROVAL', { align: 'center' });
+    doc.moveDown(1);
+    doc.strokeColor('#EEEEEE').lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown(1.5);
+
+    // Certificate of Authenticity Ribbon
+    doc.rect(50, doc.y, 500, 25).fill('#F3F4F6');
+    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('OFFICIAL DOCUMENT • PROTECTED BY SECURE VERIFICATION', 60, doc.y + 7, { align: 'center' });
+    doc.moveDown(2);
+
+    // Student Info Table Style
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('STUDENT INFORMATION', { characterSpacing: 1 });
+    doc.moveDown(0.5);
+
+    const infoY = doc.y;
+    doc.fillColor(textColor).font('Helvetica');
+    doc.text('Name:', 50, infoY);
+    doc.font('Helvetica-Bold').text(leaveRequest.studentName, 150, infoY);
+
+    doc.font('Helvetica').text('Email:', 50, infoY + 20);
+    doc.text(leaveRequest.studentEmail, 150, infoY + 20);
+
+    doc.text('Dept/Year:', 50, infoY + 40);
+    doc.text(`${leaveRequest.department} - ${leaveRequest.year} Year (${leaveRequest.section})`, 150, infoY + 40);
+    doc.moveDown(3);
+
+    // Leave Details
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('LEAVE DETAILS', { characterSpacing: 1 });
+    doc.moveDown(0.5);
+
+    const detailY = doc.y;
+    doc.fillColor(textColor).font('Helvetica');
+    doc.text('Subject:', 50, detailY);
+    doc.text(leaveRequest.subject, 150, detailY, { width: 400 });
+
+    doc.text('Duration:', 50, detailY + 20);
+    doc.text(`${leaveRequest.fromDate} to ${leaveRequest.toDate} (${leaveRequest.duration} Day[s])`, 150, detailY + 20);
+
+    doc.text('Reason:', 50, detailY + 40);
+    doc.text(leaveRequest.reason || leaveRequest.content, 150, detailY + 40, { width: 400 });
+    doc.moveDown(4);
+
+    // Verification Section (QR and Text)
+    const qrY = doc.y;
+    try {
+        doc.image(qrBuffer, 400, qrY - 20, { width: 120 });
+    } catch (imgError) {
+        console.error('QR Image error:', imgError);
+    }
+
+    doc.fillColor(accentColor).fontSize(12).text('APPROVAL STATUS: VERIFIED', 50, qrY);
+    doc.fillColor('#059669').fontSize(10).text('Approved by Head of Department (HOD)', 50, qrY + 20);
+    doc.fillColor('#6B7280').fontSize(8);
+    doc.text(`Forwarded by: ${leaveRequest.forwardedBy || 'Department Staff'}`, 50, qrY + 40);
+    doc.text(`Approval ID: ${leaveId}`, 50, qrY + 54);
+    doc.text(`Issued On: ${new Date().toLocaleString()}`, 50, qrY + 68);
+
+    // Security Footer
+    doc.moveDown(4);
+    doc.rect(50, 700, 500, 60).fill('#F0FDF4');
+    doc.fillColor('#166534').fontSize(9).text('SECURITY WARNING: This document contains a secure digital signature encoded in the QR code. Any modification to the names, dates, or content of this PDF will be detectable. To verify authenticity, scan the QR code or visit the verification portal below.', 60, 710, { width: 480, align: 'center' });
+
+    doc.fillColor(accentColor).fontSize(8).text(verificationUrl, 50, 770, { align: 'center' });
+
+    doc.end();
+
+    return new Promise((resolve, reject) => {
+        stream.on('finish', () => {
+            console.log(`✅ Leave PDF Generated: ${pdfPath}`);
+            const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 5000}`;
+            leaveRequest.pdfUrl = `${baseUrl}/api/leave-requests/${leaveRequest._id}/download`;
+            resolve({ leaveId, pdfPath, verificationUrl });
+        });
+        stream.on('error', reject);
+    });
+};
+
 // Submit Leave Request
 exports.submitLeaveRequest = async (req, res) => {
     try {
@@ -332,112 +453,13 @@ exports.updateHODStatus = async (req, res) => {
             leaveRequest.status = 'accepted';
             console.log(`✅ Setting overall status to 'accepted' (from HOD status: ${status})`);
 
-            // Generate Secure Leave ID and PDF
-            const timestamp = new Date();
-            const dateStr = timestamp.toISOString().replace(/[-:T.Z]/g, "").substring(0, 8);
-            const randomStr = Math.random().toString(36).substring(2, 5).toUpperCase();
-            const leaveId = `ATZ-${dateStr}-${randomStr}`;
-
-            leaveRequest.leaveId = leaveId;
-
-            // Generate Verification URL
-            const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 5000}`;
-            const verificationUrl = `${baseUrl}/api/leave-requests/verify/${leaveId}`;
-            leaveRequest.verificationUrl = verificationUrl;
-
-            // Generate QR Code as Buffer (safer for PDFKit)
-            console.log(`Generating QR Code for: ${verificationUrl}`);
-            const qrBuffer = await QRCode.toBuffer(verificationUrl, {
-                margin: 1,
-                width: 200
-            });
-
-            // Create Letter Directory if not exists
-            const lettersDir = path.join(__dirname, '../letters');
-            if (!fs.existsSync(lettersDir)) {
-                fs.mkdirSync(lettersDir, { recursive: true });
-            }
-
-            // Generate PDF
-            const pdfPath = path.join(lettersDir, `${leaveId}.pdf`);
-            // PDF Design System
-            const accentColor = '#2ecc71'; // Green for Leave
-            const textColor = '#1F2937';
-
-            const doc = new PDFDocument({ margin: 50 });
-            const stream = fs.createWriteStream(pdfPath);
-            doc.pipe(stream);
-
-            // Header
-            doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(24).text('ATTENDANZY', { align: 'center', wordSpacing: 5 });
-            doc.fillColor(textColor).font('Helvetica').fontSize(14).text('OFFICIAL LEAVE APPROVAL', { align: 'center' });
-            doc.moveDown(1);
-            doc.strokeColor('#EEEEEE').lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-            doc.moveDown(1.5);
-
-            // Certificate of Authenticity Ribbon
-            doc.rect(50, doc.y, 500, 25).fill('#F3F4F6');
-            doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('OFFICIAL DOCUMENT • PROTECTED BY SECURE VERIFICATION', 60, doc.y + 7, { align: 'center' });
-            doc.moveDown(2);
-
-            // Student Info Table Style
-            doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('STUDENT INFORMATION', { characterSpacing: 1 });
-            doc.moveDown(0.5);
-
-            const infoY = doc.y;
-            doc.fillColor(textColor).font('Helvetica');
-            doc.text('Name:', 50, infoY);
-            doc.font('Helvetica-Bold').text(leaveRequest.studentName, 150, infoY);
-
-            doc.font('Helvetica').text('Email:', 50, infoY + 20);
-            doc.text(leaveRequest.studentEmail, 150, infoY + 20);
-
-            doc.text('Dept/Year:', 50, infoY + 40);
-            doc.text(`${leaveRequest.department} - ${leaveRequest.year} Year (${leaveRequest.section})`, 150, infoY + 40);
-            doc.moveDown(3);
-
-            // Leave Details
-            doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('LEAVE DETAILS', { characterSpacing: 1 });
-            doc.moveDown(0.5);
-
-            const detailY = doc.y;
-            doc.fillColor(textColor).font('Helvetica');
-            doc.text('Subject:', 50, detailY);
-            doc.text(leaveRequest.subject, 150, detailY, { width: 400 });
-
-            doc.text('Duration:', 50, detailY + 20);
-            doc.text(`${leaveRequest.fromDate} to ${leaveRequest.toDate} (${leaveRequest.duration} Day[s])`, 150, detailY + 20);
-
-            doc.text('Reason:', 50, detailY + 40);
-            doc.text(leaveRequest.reason || leaveRequest.content, 150, detailY + 40, { width: 400 });
-            doc.moveDown(4);
-
-            // Verification Section (QR and Text)
-            const qrY = doc.y;
+            // Use the helper for PDF generation
             try {
-                doc.image(qrBuffer, 400, qrY - 20, { width: 120 });
-            } catch (imgError) {
-                console.error('QR Image error:', imgError);
+                await generateLeavePDFHelper(leaveRequest);
+            } catch (pdfError) {
+                console.error('❌ PDF Generation Error:', pdfError);
+                // We still save the approval status even if PDF fails
             }
-
-            doc.fillColor(accentColor).fontSize(12).text('APPROVAL STATUS: VERIFIED', 50, qrY);
-            doc.fillColor('#059669').fontSize(10).text('Approved by Head of Department (HOD)', 50, qrY + 20);
-            doc.fillColor('#6B7280').fontSize(8);
-            doc.text(`Forwarded by: ${leaveRequest.forwardedBy || 'Department Staff'}`, 50, qrY + 40);
-            doc.text(`Approval ID: ${leaveId}`, 50, qrY + 54);
-            doc.text(`Issued On: ${new Date().toLocaleString()}`, 50, qrY + 68);
-
-            // Security Footer
-            doc.moveDown(4);
-            doc.rect(50, 700, 500, 60).fill('#F0FDF4');
-            doc.fillColor('#166534').fontSize(9).text('SECURITY WARNING: This document contains a secure digital signature encoded in the QR code. Any modification to the names, dates, or content of this PDF will be detectable. To verify authenticity, scan the QR code or visit the verification portal below.', 60, 710, { width: 480, align: 'center' });
-
-            doc.fillColor(accentColor).fontSize(8).text(verificationUrl, 50, 770, { align: 'center' });
-
-            doc.end();
-            console.log(`✅ Leave PDF Generated: ${pdfPath}`);
-
-            leaveRequest.pdfUrl = `${baseUrl}/api/leave-requests/${leaveRequest._id}/download`;
         } else if (status && status.toLowerCase() === 'rejected') {
             leaveRequest.status = 'rejected';
             console.log(`❌ Setting overall status to 'rejected'`);
@@ -730,18 +752,33 @@ exports.downloadLeavePDF = async (req, res) => {
         }
 
         if (!leave.leaveId) {
-            return res.status(404).json({
-                success: false,
-                message: `Leave PDF not yet generated for this request. Status is: ${leave.status}. Secure ID (leaveId) is missing.`,
-            });
+            // Fail-safe: If status is accepted but ID/PDF missing, generate now!
+            if (leave.status === 'accepted') {
+                console.log(`⚡ On-the-fly regeneration for Leave ${id}`);
+                await generateLeavePDFHelper(leave);
+                await leave.save();
+            } else {
+                return res.status(404).json({
+                    success: false,
+                    message: `Leave PDF not yet generated for this request. Status is: ${leave.status}. Secure ID (leaveId) is missing.`,
+                });
+            }
         }
 
-        const pdfPath = path.join(__dirname, '../letters', `${leave.leaveId}.pdf`);
+        const lettersDir = path.join(__dirname, '../letters');
+        const pdfPath = path.join(lettersDir, `${leave.leaveId}.pdf`);
+
+        // Fail-safe: If record has ID but file is missing on disk
+        if (!fs.existsSync(pdfPath)) {
+            console.log(`⚡ PDF file missing on disk, regenerating: ${pdfPath}`);
+            await generateLeavePDFHelper(leave);
+            await leave.save();
+        }
 
         if (!fs.existsSync(pdfPath)) {
             return res.status(404).json({
                 success: false,
-                message: 'PDF file missing on server',
+                message: `Failed to generate or find PDF file on server.`,
             });
         }
 
