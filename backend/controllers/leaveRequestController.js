@@ -37,6 +37,15 @@ const generateLeavePDFHelper = async (leaveRequest) => {
     const accentColor = '#059669';
     const logoPath = path.join(__dirname, '../assets/logo.jpg');
 
+    // --- Background Watermark ---
+    if (fs.existsSync(logoPath)) {
+        doc.save();
+        doc.opacity(0.1);
+        doc.image(logoPath, 150, 300, { width: 300 });
+        doc.restore();
+    }
+
+    // --- Institutional Letterhead (Top Header) ---
     if (fs.existsSync(logoPath)) {
         doc.image(logoPath, 50, 45, { width: 55 });
     }
@@ -47,54 +56,54 @@ const generateLeavePDFHelper = async (leaveRequest) => {
     doc.text('OMR, Thalambur, Chennai - 603 103, Tamil Nadu, India', 115, 82);
     doc.strokeColor('#333333').lineWidth(1).moveTo(50, 105).lineTo(545, 105).stroke();
 
-    doc.y = 115;
+    doc.y = 120;
     const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    doc.font('Helvetica-Bold').fontSize(9).text(`Ref: ACT/LV/${leaveId}`, 50, 115);
-    doc.text(`Date: ${today}`, 450, 115, { align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(9).text(`Ref: ACT/LV/${leaveId}`, 50, 120);
+    doc.text(`Date: ${today}`, 450, 120, { align: 'right' });
 
-    doc.moveDown(1.5);
+    doc.moveDown(3);
     doc.font('Helvetica-Bold').fontSize(10).text('From,', 50);
     doc.font('Helvetica').fontSize(10);
     doc.text(`${leaveRequest.studentName.toUpperCase()},`, 70);
     doc.text(`${leaveRequest.studentEmail.split('@')[0].toUpperCase()}, ${leaveRequest.year} Year / ${leaveRequest.section},`, 70);
     doc.text(`Department of ${leaveRequest.department || 'Engineering'}, Agni College of Technology.`, 70);
 
-    doc.moveDown(1);
+    doc.moveDown(2);
     doc.font('Helvetica-Bold').fontSize(10).text('To,', 50);
     doc.font('Helvetica').fontSize(10);
     doc.text('The Head of Department,', 70);
     doc.text(`Department of ${leaveRequest.department || 'Engineering'}, Agni College of Technology.`, 70);
 
-    doc.moveDown(1);
+    doc.moveDown(2);
     doc.font('Helvetica-Bold').fontSize(10).text('Through:', 50);
     doc.font('Helvetica').fontSize(10).text('The Class In-charge / Staff Advisor.', 70);
 
-    doc.moveDown(1.5);
-    doc.font('Helvetica-Bold').fontSize(10).text(`Subject: Request for ${leaveRequest.leaveType || 'Leave'} Approval - Regarding.`, 50, doc.y, { underline: true });
+    doc.moveDown(3);
+    doc.font('Helvetica-Bold').fontSize(10).text(`Subject: Official Request for ${leaveRequest.leaveType || 'Leave'} Authorization - Regarding.`, 50, doc.y, { underline: true });
 
-    doc.moveDown(2);
+    doc.moveDown(3.5);
     doc.font('Helvetica').fontSize(11).text('Respected Sir/Madam,', 50);
-    doc.moveDown(0.8);
-    const bodyContent = `I am writing this to request permission for ${leaveRequest.duration} day[s] of leave from ${leaveRequest.fromDate} to ${leaveRequest.toDate} due to ${leaveRequest.subject.toLowerCase()}.`;
-    doc.text(bodyContent, 50, doc.y, { align: 'justify', lineGap: 2 });
-
-    doc.moveDown(0.8);
-    doc.font('Helvetica-Bold').fontSize(10).text('Detailed Reason:', 50);
-    doc.font('Helvetica').fontSize(10).text(leaveRequest.reason || leaveRequest.content || 'N/A', 60, doc.y + 2, { width: 485, align: 'justify' });
+    doc.moveDown(1.5);
+    const bodyContent = `I am writing this to formally request your approval for ${leaveRequest.duration} day[s] of leave, spanning from ${leaveRequest.fromDate} to ${leaveRequest.toDate}. This request is necessitated by ${leaveRequest.subject.toLowerCase()}, as detailed in the statement of purpose below.`;
+    doc.text(bodyContent, 50, doc.y, { align: 'justify', lineGap: 4 });
 
     doc.moveDown(1.5);
-    doc.text('I request you to kindly grant me permission for the same.', 50);
-    doc.moveDown(1.5);
+    doc.font('Helvetica-Bold').fontSize(10).text('Statement of Purpose / Detailed Reason:', 50);
+    doc.font('Helvetica').fontSize(10).text(leaveRequest.reason || leaveRequest.content || 'N/A', 60, doc.y + 4, { width: 485, align: 'justify', lineGap: 2 });
+
+    doc.moveDown(3.5);
+    doc.text('I assure you that I will make up for the academic hours missed during this period. I request you to kindly grant me permission for the same.', 50, doc.y, { align: 'justify' });
+    doc.moveDown(2.5);
     doc.text('Thanking you,', 50);
-    doc.moveDown(2);
+    doc.moveDown(4);
     doc.font('Helvetica-Bold').text('Yours obediently,', 400);
     doc.text(leaveRequest.studentName.toUpperCase(), 400);
 
-    const bottomBlockY = 650;
-    doc.strokeColor('#666666').lineWidth(0.5).dash(5, { space: 3 }).moveTo(50, bottomBlockY - 10).lineTo(545, bottomBlockY - 10).stroke().undash();
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(11).text('■ OFFICIAL DIGITAL APPROVAL', 50, bottomBlockY);
+    const bottomBlockY = 670;
+    doc.strokeColor('#666666').lineWidth(0.5).dash(5, { space: 3 }).moveTo(50, bottomBlockY - 15).lineTo(545, bottomBlockY - 15).stroke().undash();
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(11).text('■ OFFICIAL DIGITAL AUTHORIZATION', 50, bottomBlockY);
     doc.y = bottomBlockY + 25;
-    doc.fillColor(textColor).font('Helvetica').fontSize(9).text('The above request has been verified and approved by the department officials through the Attendanzy System.', 50);
+    doc.fillColor(textColor).font('Helvetica').fontSize(9).text('The above request has been verified and authorized by the department officials through the Attendanzy Secure System.', 50);
     doc.moveDown(0.5);
     doc.font('Helvetica-Bold').fontSize(8);
     doc.text(`- STAFF APPROVAL: Forwarded by ${leaveRequest.forwardedBy || 'Class In-charge'}`, 60);

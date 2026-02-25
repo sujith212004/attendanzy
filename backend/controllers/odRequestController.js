@@ -37,6 +37,15 @@ const generateODPDFHelper = async (odRequest) => {
     const accentColor = '#2563EB'; // Blue for OD
     const logoPath = path.join(__dirname, '../assets/logo.jpg');
 
+    // --- Background Watermark ---
+    if (fs.existsSync(logoPath)) {
+        doc.save();
+        doc.opacity(0.1);
+        doc.image(logoPath, 150, 300, { width: 300 });
+        doc.restore();
+    }
+
+    // --- Institutional Letterhead (Top Header) ---
     if (fs.existsSync(logoPath)) {
         doc.image(logoPath, 50, 45, { width: 55 });
     }
@@ -47,54 +56,54 @@ const generateODPDFHelper = async (odRequest) => {
     doc.text('OMR, Thalambur, Chennai - 603 103, Tamil Nadu, India', 115, 82);
     doc.strokeColor('#333333').lineWidth(1).moveTo(50, 105).lineTo(545, 105).stroke();
 
-    doc.y = 115;
+    doc.y = 120;
     const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    doc.font('Helvetica-Bold').fontSize(9).text(`Ref: ACT/OD/${odId}`, 50, 115);
-    doc.text(`Date: ${today}`, 450, 115, { align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(9).text(`Ref: ACT/OD/${odId}`, 50, 120);
+    doc.text(`Date: ${today}`, 450, 120, { align: 'right' });
 
-    doc.moveDown(1.5);
+    doc.moveDown(3);
     doc.font('Helvetica-Bold').fontSize(10).text('From,', 50);
     doc.font('Helvetica').fontSize(10);
     doc.text(`${odRequest.studentName.toUpperCase()},`, 70);
     doc.text(`${odRequest.studentEmail.split('@')[0].toUpperCase()}, ${odRequest.year} Year / ${odRequest.section},`, 70);
     doc.text(`Department of ${odRequest.department || 'Engineering'}, Agni College of Technology.`, 70);
 
-    doc.moveDown(1);
+    doc.moveDown(2);
     doc.font('Helvetica-Bold').fontSize(10).text('To,', 50);
     doc.font('Helvetica').fontSize(10);
     doc.text('The Head of Department,', 70);
     doc.text(`Department of ${odRequest.department || 'Engineering'}, Agni College of Technology.`, 70);
 
-    doc.moveDown(1);
+    doc.moveDown(2);
     doc.font('Helvetica-Bold').fontSize(10).text('Through:', 50);
     doc.font('Helvetica').fontSize(10).text('The Class In-charge / Staff Advisor.', 70);
 
-    doc.moveDown(1.5);
-    doc.font('Helvetica-Bold').fontSize(10).text(`Subject: Request for On-Duty (OD) Approval - Regarding.`, 50, doc.y, { underline: true });
+    doc.moveDown(3);
+    doc.font('Helvetica-Bold').fontSize(10).text(`Subject: Official Request for On-Duty (OD) Authorization - Regarding.`, 50, doc.y, { underline: true });
 
-    doc.moveDown(2);
+    doc.moveDown(3.5);
     doc.font('Helvetica').fontSize(11).text('Respected Sir/Madam,', 50);
-    doc.moveDown(0.8);
-    const bodyContent = `I am writing this to request permission for On-Duty (OD) from ${odRequest.from} to ${odRequest.to} to participate in ${odRequest.subject}. I have provided the detailed purpose below:`;
-    doc.text(bodyContent, 50, doc.y, { align: 'justify', lineGap: 2 });
-
-    doc.moveDown(0.8);
-    doc.font('Helvetica-Bold').fontSize(10).text('Activity Description:', 50);
-    doc.font('Helvetica').fontSize(10).text(odRequest.content || odRequest.reason || 'N/A', 60, doc.y + 2, { width: 485, align: 'justify' });
+    doc.moveDown(1.5);
+    const bodyContent = `I am writing this to formally request your authorization for On-Duty (OD) status from ${odRequest.from} to ${odRequest.to} to participate in ${odRequest.subject}. I have provided the detailed activity description below.`;
+    doc.text(bodyContent, 50, doc.y, { align: 'justify', lineGap: 4 });
 
     doc.moveDown(1.5);
-    doc.text('I request you to kindly grant me permission for the same.', 50);
-    doc.moveDown(1.5);
+    doc.font('Helvetica-Bold').fontSize(10).text('Activity Description / Detailed Purpose:', 50);
+    doc.font('Helvetica').fontSize(10).text(odRequest.content || odRequest.reason || 'N/A', 60, doc.y + 4, { width: 485, align: 'justify', lineGap: 2 });
+
+    doc.moveDown(3.5);
+    doc.text('I request you to kindly grant me permission for the same as it is part of an official academic/professional activity.', 50, doc.y, { align: 'justify' });
+    doc.moveDown(2.5);
     doc.text('Thanking you,', 50);
-    doc.moveDown(2);
+    doc.moveDown(4);
     doc.font('Helvetica-Bold').text('Yours obediently,', 400);
     doc.text(odRequest.studentName.toUpperCase(), 400);
 
-    const bottomBlockY = 650;
-    doc.strokeColor('#666666').lineWidth(0.5).dash(5, { space: 3 }).moveTo(50, bottomBlockY - 10).lineTo(545, bottomBlockY - 10).stroke().undash();
+    const bottomBlockY = 670;
+    doc.strokeColor('#666666').lineWidth(0.5).dash(5, { space: 3 }).moveTo(50, bottomBlockY - 15).lineTo(545, bottomBlockY - 15).stroke().undash();
     doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(11).text('■ OFFICIAL OD AUTHORIZATION', 50, bottomBlockY);
     doc.y = bottomBlockY + 25;
-    doc.fillColor(textColor).font('Helvetica').fontSize(9).text('The above request has been verified and authorized by the department officials through the Attendanzy System.', 50);
+    doc.fillColor(textColor).font('Helvetica').fontSize(9).text('The above request has been verified and authorized by the department officials through the Attendanzy Secure System.', 50);
     doc.moveDown(0.5);
     doc.font('Helvetica-Bold').fontSize(8);
     doc.text(`- STAFF APPROVAL: Forwarded by ${odRequest.forwardedBy || 'Department Staff'}`, 60);
