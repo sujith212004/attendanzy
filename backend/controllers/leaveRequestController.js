@@ -40,6 +40,14 @@ const generateLeavePDFHelper = async (leaveRequest) => {
 
     const logoPath = path.join(__dirname, '../assets/logo.jpg');
 
+    // --- Background Watermark ---
+    if (fs.existsSync(logoPath)) {
+        doc.save();
+        doc.opacity(0.04);
+        doc.image(logoPath, 147, 280, { width: 300 });
+        doc.restore();
+    }
+
     // --- Header Section ---
     if (fs.existsSync(logoPath)) {
         doc.image(logoPath, 50, 35, { width: 65 });
