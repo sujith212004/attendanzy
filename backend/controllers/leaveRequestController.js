@@ -21,7 +21,11 @@ const generateLeavePDFHelper = async (leaveRequest) => {
     const verificationUrl = `${baseUrl}/api/leave-requests/verify/${leaveId}`;
     leaveRequest.verificationUrl = verificationUrl;
 
-    const qrBuffer = await QRCode.toBuffer(verificationUrl, { margin: 1, width: 200 });
+    const qrBuffer = await QRCode.toBuffer(verificationUrl, {
+        margin: 1,
+        width: 300,
+        errorCorrectionLevel: 'H' // High error correction for logo overlay
+    });
 
     const lettersDir = path.join(__dirname, '../letters');
     if (!fs.existsSync(lettersDir)) {
@@ -29,110 +33,119 @@ const generateLeavePDFHelper = async (leaveRequest) => {
     }
 
     const pdfPath = path.join(lettersDir, `${leaveId}.pdf`);
-    // Delete existing PDF to ensure fresh generation with new design
     if (fs.existsSync(pdfPath)) {
         try { fs.unlinkSync(pdfPath); } catch (e) { }
     }
 
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const doc = new PDFDocument({ margin: 40, size: 'A4' }); // Slightly tighter margins for 1-page safety
     const stream = fs.createWriteStream(pdfPath);
     doc.pipe(stream);
 
-    const textColor = '#000000';
+    const textColor = '#111827';
     const accentColor = '#059669';
     const logoPath = path.join(__dirname, '../assets/logo.jpg');
 
     // --- Background Watermark ---
     if (fs.existsSync(logoPath)) {
         doc.save();
-        doc.opacity(0.06); // Extremely subtle watermark
-        doc.image(logoPath, 125, 250, { width: 350 });
+        doc.opacity(0.05);
+        doc.image(logoPath, 147, 280, { width: 300 });
         doc.restore();
     }
 
     // --- Institutional Letterhead (Top Header) ---
     if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, 50, 45, { width: 55 });
+        doc.image(logoPath, 45, 40, { width: 60 });
     }
 
-    doc.fillColor(textColor).font('Helvetica-Bold').fontSize(16).text('AGNI COLLEGE OF TECHNOLOGY', 115, 45);
-    doc.font('Helvetica-Bold').fontSize(8).text('An AUTONOMOUS Institution | ISO 9001:2015 Certified', 115, 62);
-    doc.font('Helvetica').fontSize(8).text('Affiliated to Anna University | Approved by AICTE', 115, 72);
-    doc.text('OMR, Thalambur, Chennai - 603 103, Tamil Nadu, India', 115, 82);
-    doc.strokeColor('#333333').lineWidth(1).moveTo(50, 105).lineTo(545, 105).stroke();
+    doc.fillColor(textColor).font('Helvetica-Bold').fontSize(18).text('AGNI COLLEGE OF TECHNOLOGY', 115, 42);
+    doc.font('Helvetica-Bold').fontSize(8.5).text('An AUTONOMOUS Institution | ISO 9001:2015 Certified', 115, 62);
+    doc.font('Helvetica').fontSize(8.5).text('Affiliated to Anna University | Approved by AICTE', 115, 74);
+    doc.text('OMR, Thalambur, Chennai - 603 103, Tamil Nadu, India', 115, 86);
+    doc.strokeColor('#000000').lineWidth(1.5).moveTo(40, 110).lineTo(555, 110).stroke();
 
-    // Ref and Date (More Margin)
-    doc.y = 135;
+    // Ref and Date
+    doc.y = 130;
     const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    doc.font('Helvetica-Bold').fontSize(9).text(`Ref: ACT/LV/${leaveId}`, 50, 135);
-    doc.text(`Date: ${today}`, 450, 135, { align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(10).text(`Ref No: LV/${leaveId}`, 45, 130);
+    doc.text(`Date: ${today}`, 440, 130, { align: 'right' });
 
-    // Vertical distribution start
-    doc.moveDown(5);
+    doc.moveDown(3);
 
     // --- "From" Section ---
-    doc.font('Helvetica-Bold').fontSize(10).text('From,', 50);
-    doc.moveDown(0.5);
-    doc.font('Helvetica').fontSize(10);
+    doc.font('Helvetica-Bold').fontSize(11).text('FROM:', 45);
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(11);
     const fromText = leaveRequest.from || `${leaveRequest.studentName}\nDepartment of ${leaveRequest.department}\n${leaveRequest.year}-${leaveRequest.section}`;
     doc.text(fromText, 75, doc.y, { lineGap: 3 });
 
-    doc.moveDown(4);
+    doc.moveDown(2);
 
     // --- "To" Section ---
-    doc.font('Helvetica-Bold').fontSize(10).text('To,', 50);
-    doc.moveDown(0.5);
-    doc.font('Helvetica').fontSize(10);
+    doc.font('Helvetica-Bold').fontSize(11).text('TO:', 45);
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(11);
     const toText = leaveRequest.to || `The Head of Department,\nDepartment of ${leaveRequest.department},\nAgni College of Technology.`;
     doc.text(toText, 75, doc.y, { lineGap: 3 });
 
-    doc.moveDown(6);
+    doc.moveDown(3);
 
     // --- Subject Line ---
-    doc.font('Helvetica-Bold').fontSize(11).text(`Subject: ${leaveRequest.subject.toUpperCase()} - Regarding.`, 50, doc.y, { underline: true });
+    doc.font('Helvetica-Bold').fontSize(11.5).text(`Subject: ${leaveRequest.subject.toUpperCase()} - REGARDING.`, 45, doc.y, { underline: true });
+
+    doc.moveDown(4);
+
+    // --- Body Section ---
+    doc.font('Helvetica').fontSize(12).text('Respected Sir/Madam,', 45);
+    doc.moveDown(1.5);
+
+    const mainContent = leaveRequest.content || leaveRequest.reason || 'Requested leave authorization.';
+    doc.text(mainContent, 45, doc.y, { align: 'justify', lineGap: 5, width: 505 });
 
     doc.moveDown(5);
+    doc.text('Thanking you,', 45);
 
-    // --- Content Section ---
-    doc.font('Helvetica').fontSize(12).text('Respected Sir/Madam,', 50);
-    doc.moveDown(2);
+    doc.moveDown(4);
+    doc.font('Helvetica-Bold').text('Yours obediently,', 380);
+    doc.moveDown(0.4);
+    doc.text(leaveRequest.studentName.toUpperCase(), 380);
 
-    // Display student content directly
-    const mainContent = leaveRequest.content || leaveRequest.reason || 'No content provided.';
-    doc.text(mainContent, 50, doc.y, { align: 'justify', lineGap: 5 });
+    // --- High-Fidelity Digital Authorization Area (Sticky Footer) ---
+    const bottomBlockY = 665;
+    doc.strokeColor('#111827').lineWidth(2).moveTo(40, bottomBlockY - 20).lineTo(555, bottomBlockY - 20).stroke();
 
-    doc.moveDown(7);
-    doc.text('Thanking you,', 50);
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(14).text('SECURE DIGITAL AUTHORIZATION', 45, bottomBlockY);
 
-    doc.moveDown(5);
-    doc.font('Helvetica-Bold').text('Yours obediently,', 400);
-    doc.moveDown(0.5);
-    doc.text(leaveRequest.studentName.toUpperCase(), 400);
+    doc.y = bottomBlockY + 30;
+    doc.fillColor('#374151').font('Helvetica').fontSize(9.5).text('This document is electronically generated and officially verified by the Agni College of Technology institutional portal. Validity can be verified by scanning the Doc-Verify QR code.', 45, doc.y, { width: 380, lineGap: 2 });
 
-    // --- Official Approval Block (Fixed Bottom) ---
-    const bottomBlockY = 660;
-    doc.strokeColor('#444444').lineWidth(0.7).dash(5, { space: 3 }).moveTo(50, bottomBlockY - 20).lineTo(545, bottomBlockY - 20).stroke().undash();
+    doc.moveDown(1);
+    doc.fillColor(textColor).font('Helvetica-Bold').fontSize(9);
+    doc.text(`VERIFIED BY: ${leaveRequest.forwardedBy || 'Department Staff'}`, 45);
+    doc.text(`AUTHORIZED BY: HEAD OF DEPARTMENT`, 45);
+    doc.text(`TIMESTAMP: ${new Date().toLocaleString('en-IN')}`, 45);
 
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('■ OFFICIAL DIGITAL AUTHORIZATION', 50, bottomBlockY);
-
-    doc.y = bottomBlockY + 28;
-    doc.fillColor('#333333').font('Helvetica').fontSize(9).text('This document is electronically verified and authorized by the department officials through the Attendanzy System.', 50, doc.y, { width: 380 });
-
-    doc.moveDown(1.2);
-    doc.font('Helvetica-Bold').fontSize(8.5);
-    doc.text(`- STAFF APPROVAL: Forwarded by ${leaveRequest.forwardedBy || 'Department Staff'}`, 60);
-    doc.text(`- HOD APPROVAL: Officially Authorized by Head of Department`, 60);
-    doc.text(`- TIMESTAMP: ${new Date().toLocaleString('en-IN')}`, 60);
-
-    // QR Code Placement
+    // --- Branded QR Code ---
     try {
-        doc.image(qrBuffer, 460, bottomBlockY + 12, { width: 80 });
-        doc.fillColor('#666666').font('Helvetica').fontSize(6.5).text('DOC-VERIFY QR', 460, bottomBlockY + 95, { width: 80, align: 'center' });
+        const qrX = 460;
+        const qrY = bottomBlockY + 5;
+        const qrSize = 85;
+
+        doc.image(qrBuffer, qrX, qrY, { width: qrSize });
+
+        // Add Attendanzy branding box in the center of QR
+        const boxSize = 20;
+        doc.save();
+        doc.fillColor('white').rect(qrX + (qrSize / 2) - (boxSize / 2), qrY + (qrSize / 2) - (boxSize / 2), boxSize, boxSize).fill();
+        doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(6).text('ATZ', qrX + (qrSize / 2) - (boxSize / 2), qrY + (qrSize / 2) - 2, { width: boxSize, align: 'center' });
+        doc.restore();
+
+        doc.fillColor('#6B7280').font('Helvetica-Bold').fontSize(7).text('DOC-VERIFY QR', qrX, qrY + qrSize + 5, { width: qrSize, align: 'center' });
     } catch (e) { }
 
     // Security Footer
-    doc.strokeColor('#DDDDDD').lineWidth(0.5).moveTo(50, 790).lineTo(545, 790).stroke();
-    doc.fillColor('#777777').font('Helvetica-Oblique').fontSize(7.5).text('Securely verifiable at: ' + verificationUrl, 50, 796, { width: 495, align: 'center' });
+    doc.strokeColor('#E5E7EB').lineWidth(1).moveTo(40, 805).lineTo(555, 805).stroke();
+    doc.fillColor('#9CA3AF').font('Helvetica').fontSize(8).text('System generated secure document | ACT-Attendanzy Portal | CID: ' + (leaveRequest._id.toString().substring(0, 8)), 40, 812, { width: 515, align: 'center' });
 
     doc.end();
 
@@ -300,9 +313,53 @@ exports.verifyLeave = async (req, res) => {
     try {
         const { leaveId } = req.params;
         const leave = await LeaveRequest.findOne({ leaveId });
-        if (!leave) return res.status(404).send('<h1 style="color:red;text-align:center;">INVALID DOCUMENT ❌</h1>');
-        res.send(`<html><head><title>Verify</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{font-family:sans-serif;background:#f4f7f6;padding:20px;}.card{max-width:500px;margin:0 auto;background:white;padding:30px;border-radius:15px;box-shadow:0 10px 25px rgba(0,0,0,0.1); border-top: 5px solid #059669;}.header{text-align:center;border-bottom:1px solid #eee;margin-bottom:20px;}.status{display:inline-block;padding:8px 15px;border-radius:50px;background:#e7f9ed;color:#059669;font-weight:bold;margin-bottom:20px;}.field{margin-bottom:12px;}.label{font-size:11px;color:#888;text-transform:uppercase;}.value{font-size:15px;font-weight:500;}</style></head><body><div class="card"><div class="header"><h2>Attendanzy Verification</h2><p>Ref: ${leave.leaveId}</p></div><div style="text-align:center;"><div class="status">VALID LEAVE APPROVAL</div></div><div class="field"><div class="label">Student</div><div class="value">${leave.studentName}</div></div><div class="field"><div class="label">Reg No</div><div class="value">${leave.studentEmail.split('@')[0].toUpperCase()}</div></div><div class="field"><div class="label">Dates</div><div class="value">${leave.fromDate} to ${leave.toDate}</div></div><div class="field"><div class="label">Approved By</div><div class="value">HOD (via ${leave.forwardedBy || 'Staff'})</div></div><div class="footer" style="text-align:center;margin-top:20px;font-size:10px;color:#aaa;">Secure Document Verification System</div></div></body></html>`);
-    } catch (e) { res.status(500).send("Error"); }
+        if (!leave) return res.status(404).send('<h1 style="color:#ef4444;text-align:center;padding:50px;font-family:sans-serif;">INVALID DOCUMENT ❌<br><small style="color:#6b7280;">This record does not exist in the institutional database.</small></h1>');
+
+        res.send(`
+        <html>
+        <head>
+            <title>Secure Verification | Attendanzy</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body { font-family: 'Inter', -apple-system, sans-serif; background: #f9fafb; margin: 0; padding: 20px; color: #111827; }
+                .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #e5e7eb; }
+                .banner { background: #059669; color: white; padding: 30px; text-align: center; }
+                .banner h1 { margin: 0; font-size: 24px; letter-spacing: -0.5px; }
+                .content { padding: 40px; }
+                .status-badge { display: inline-flex; align-items: center; background: #ecfdf5; color: #059669; padding: 10px 20px; border-radius: 100px; font-weight: 700; font-size: 14px; margin-bottom: 30px; }
+                .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+                .field { margin-bottom: 25px; }
+                .label { font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+                .value { font-size: 16px; font-weight: 500; color: #111827; }
+                .footer { padding: 20px; background: #f3f4f6; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #e5e7eb; }
+                @media (max-width: 480px) { .grid { grid-template-columns: 1fr; gap: 15px; } }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="banner">
+                    <h1>Agni College of Technology</h1>
+                </div>
+                <div class="content">
+                    <div style="text-align: center;">
+                        <div class="status-badge">✓ OFFICIALLY VERIFIED LEAVE RECORD</div>
+                    </div>
+                    <div class="grid">
+                        <div class="field"><div class="label">Reference ID</div><div class="value">${leave.leaveId}</div></div>
+                        <div class="field"><div class="label">Date Issued</div><div class="value">${new Date(leave.updatedAt).toLocaleDateString()}</div></div>
+                        <div class="field"><div class="label">Student Name</div><div class="value">${leave.studentName}</div></div>
+                        <div class="field"><div class="label">Register No</div><div class="value">${leave.studentEmail.split('@')[0].toUpperCase()}</div></div>
+                        <div class="field"><div class="label">Leave Duration</div><div class="value">${leave.duration} Day(s)</div></div>
+                        <div class="field"><div class="label">Valid Dates</div><div class="value">${leave.fromDate} to ${leave.toDate}</div></div>
+                        <div class="field" style="grid-column: 1 / -1;"><div class="label">Verified By</div><div class="value">HOD, Dept of ${leave.department}</div></div>
+                    </div>
+                </div>
+                <div class="footer">Attendanzy Secure Document Verification Gateway | ACT-Portal</div>
+            </div>
+        </body>
+        </html>
+        `);
+    } catch (e) { res.status(500).send("Verification Gateway Error"); }
 };
 
 exports.downloadLeavePDF = async (req, res) => {
@@ -313,7 +370,6 @@ exports.downloadLeavePDF = async (req, res) => {
         const leave = await LeaveRequest.findById(id);
         if (!leave) return res.status(404).json({ success: false, message: 'Not found' });
 
-        // Force regeneration to show latest design
         if (leave.status === 'accepted') {
             await generateLeavePDFHelper(leave);
         } else if (!leave.leaveId || !fs.existsSync(path.join(__dirname, '../letters', `${leave.leaveId}.pdf`))) {
