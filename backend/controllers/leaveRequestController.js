@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Helper to generate Secure Leave ID and PDF (Strict One-Page Memorandum Style)
+ * Helper to generate Secure Leave ID and PDF (Exact Image Match Layout)
  */
 const generateLeavePDFHelper = async (leaveRequest) => {
     if (!leaveRequest.leaveId) {
@@ -21,11 +21,7 @@ const generateLeavePDFHelper = async (leaveRequest) => {
     const verificationUrl = `${baseUrl}/api/leave-requests/verify/${leaveId}`;
     leaveRequest.verificationUrl = verificationUrl;
 
-    const qrBuffer = await QRCode.toBuffer(verificationUrl, {
-        margin: 1,
-        width: 300,
-        errorCorrectionLevel: 'H' // High error correction for logo overlay
-    });
+    const qrBuffer = await QRCode.toBuffer(verificationUrl, { margin: 1, width: 250 });
 
     const lettersDir = path.join(__dirname, '../letters');
     if (!fs.existsSync(lettersDir)) {
@@ -37,115 +33,110 @@ const generateLeavePDFHelper = async (leaveRequest) => {
         try { fs.unlinkSync(pdfPath); } catch (e) { }
     }
 
-    const doc = new PDFDocument({ margin: 40, size: 'A4' }); // Slightly tighter margins for 1-page safety
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
     const stream = fs.createWriteStream(pdfPath);
     doc.pipe(stream);
 
-    const textColor = '#111827';
-    const accentColor = '#059669';
     const logoPath = path.join(__dirname, '../assets/logo.jpg');
 
-    // --- Background Watermark ---
+    // --- Header Section (Matching Image) ---
     if (fs.existsSync(logoPath)) {
-        doc.save();
-        doc.opacity(0.05);
-        doc.image(logoPath, 147, 280, { width: 300 });
-        doc.restore();
+        doc.image(logoPath, 50, 45, { width: 70 });
     }
 
-    // --- Institutional Letterhead (Top Header) ---
-    if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, 45, 40, { width: 60 });
-    }
+    doc.fillColor('#1F2937').font('Helvetica-Bold').fontSize(18).text('AGNI COLLEGE OF TECHNOLOGY', 130, 60);
+    doc.font('Helvetica-Bold').fontSize(8.5).text('An Autonomous Institution | Affiliated to Anna University', 130, 82, { align: 'center', width: 400 });
+    doc.font('Helvetica').fontSize(8.5).text('OMR, Thalambur, Chennai - 603103', 130, 94, { align: 'center', width: 400 });
 
-    doc.fillColor(textColor).font('Helvetica-Bold').fontSize(18).text('AGNI COLLEGE OF TECHNOLOGY', 115, 42);
-    doc.font('Helvetica-Bold').fontSize(8.5).text('An AUTONOMOUS Institution | ISO 9001:2015 Certified', 115, 62);
-    doc.font('Helvetica').fontSize(8.5).text('Affiliated to Anna University | Approved by AICTE', 115, 74);
-    doc.text('OMR, Thalambur, Chennai - 603 103, Tamil Nadu, India', 115, 86);
-    doc.strokeColor('#000000').lineWidth(1.5).moveTo(40, 110).lineTo(555, 110).stroke();
+    // Double lines below header
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).moveTo(50, 52).lineTo(545, 52).stroke();
+    doc.strokeColor('#D1D5DB').lineWidth(1.5).moveTo(50, 115).lineTo(545, 115).stroke();
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).moveTo(50, 119).lineTo(545, 119).stroke();
 
-    // Ref and Date
-    doc.y = 130;
-    const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    doc.font('Helvetica-Bold').fontSize(10).text(`Ref No: LV/${leaveId}`, 45, 130);
-    doc.text(`Date: ${today}`, 440, 130, { align: 'right' });
+    // --- Title ---
+    doc.y = 135;
+    doc.fillColor('#111827').font('Helvetica-Bold').fontSize(14).text('STUDENT LEAVE APPROVAL MEMORANDUM', 50, 135, { align: 'center' });
 
-    doc.moveDown(3);
+    // --- Data Table (Grid) ---
+    const tableTop = 165;
+    const col1Width = 130;
+    const tableWidth = 495;
+    const rowHeight = 22;
+    const rows = [
+        ['Reference ID:', leaveId],
+        ['Student Name:', leaveRequest.studentName],
+        ['Register Number:', leaveRequest.studentEmail.split('@')[0].toUpperCase()],
+        ['Department:', leaveRequest.department],
+        ['Year / Section:', `${leaveRequest.year} / ${leaveRequest.section}`],
+        ['Leave Type:', leaveRequest.leaveType],
+        ['Leave Period:', `${leaveRequest.fromDate} to ${leaveRequest.toDate}`],
+        ['Total Days:', `${leaveRequest.duration} Day(s)`]
+    ];
 
-    // --- "From" Section ---
-    doc.font('Helvetica-Bold').fontSize(11).text('FROM:', 45);
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(11);
-    const fromText = leaveRequest.from || `${leaveRequest.studentName}\nDepartment of ${leaveRequest.department}\n${leaveRequest.year}-${leaveRequest.section}`;
-    doc.text(fromText, 75, doc.y, { lineGap: 3 });
+    rows.forEach((row, i) => {
+        const y = tableTop + (i * rowHeight);
 
-    doc.moveDown(2);
+        // Background for labels
+        doc.fillColor('#F9FAFB').rect(50, y, col1Width, rowHeight).fill();
 
-    // --- "To" Section ---
-    doc.font('Helvetica-Bold').fontSize(11).text('TO:', 45);
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(11);
-    const toText = leaveRequest.to || `The Head of Department,\nDepartment of ${leaveRequest.department},\nAgni College of Technology.`;
-    doc.text(toText, 75, doc.y, { lineGap: 3 });
+        // Borders
+        doc.strokeColor('#D1D5DB').lineWidth(0.5)
+            .rect(50, y, tableWidth, rowHeight).stroke();
 
-    doc.moveDown(3);
+        // Text
+        doc.fillColor('#374151').font('Helvetica').fontSize(10).text(row[0], 65, y + 7);
+        doc.fillColor('#111827').font('Helvetica-Bold').fontSize(10).text(row[1], 50 + col1Width + 15, y + 7);
+    });
 
-    // --- Subject Line ---
-    doc.font('Helvetica-Bold').fontSize(11.5).text(`Subject: ${leaveRequest.subject.toUpperCase()} - REGARDING.`, 45, doc.y, { underline: true });
+    // --- Reason Section ---
+    const reasonTop = tableTop + (rows.length * rowHeight) + 25;
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(2, { space: 2 }).moveTo(50, reasonTop).lineTo(180, reasonTop).stroke().undash();
+    doc.fillColor('#4B5563').font('Helvetica-BoldOblique').fontSize(10).text('Reason for Leave', 185, reasonTop - 5, { width: 175, align: 'center' });
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(2, { space: 2 }).moveTo(365, reasonTop).lineTo(545, reasonTop).stroke().undash();
 
-    doc.moveDown(4);
+    const reasonBoxY = reasonTop + 15;
+    const reasonContent = leaveRequest.content || leaveRequest.reason || 'No specific reason provided.';
 
-    // --- Body Section ---
-    doc.font('Helvetica').fontSize(12).text('Respected Sir/Madam,', 45);
-    doc.moveDown(1.5);
+    doc.strokeColor('#9CA3AF').lineWidth(0.5).rect(50, reasonBoxY, tableWidth, 50).stroke();
+    doc.strokeColor('#E5E7EB').lineWidth(1).rect(55, reasonBoxY + 5, tableWidth - 10, 40).stroke();
+    doc.fillColor('#111827').font('Helvetica').fontSize(10.5).text(reasonContent, 65, reasonBoxY + 18, { width: 465, align: 'center' });
 
-    const mainContent = leaveRequest.content || leaveRequest.reason || 'Requested leave authorization.';
-    doc.text(mainContent, 45, doc.y, { align: 'justify', lineGap: 5, width: 505 });
+    // --- Digital Approval Workflow ---
+    const approvalTop = reasonBoxY + 75;
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(2, { space: 2 }).moveTo(50, approvalTop).lineTo(150, approvalTop).stroke().undash();
+    doc.fillColor('#4B5563').font('Helvetica-Bold').fontSize(10).text('DIGITAL APPROVAL WORKFLOW', 155, approvalTop - 5, { width: 235, align: 'center' });
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(2, { space: 2 }).moveTo(395, approvalTop).lineTo(545, approvalTop).stroke().undash();
 
-    doc.moveDown(5);
-    doc.text('Thanking you,', 45);
+    const approvalBoxY = approvalTop + 15;
+    const approvalBoxHeight = 100;
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).rect(50, approvalBoxY, tableWidth, approvalBoxHeight).stroke();
 
-    doc.moveDown(4);
-    doc.font('Helvetica-Bold').text('Yours obediently,', 380);
-    doc.moveDown(0.4);
-    doc.text(leaveRequest.studentName.toUpperCase(), 380);
+    // Approval Text Section
+    const textStartX = 65;
+    const labelWidth = 110;
 
-    // --- High-Fidelity Digital Authorization Area (Sticky Footer) ---
-    const bottomBlockY = 665;
-    doc.strokeColor('#111827').lineWidth(2).moveTo(40, bottomBlockY - 20).lineTo(555, bottomBlockY - 20).stroke();
+    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('Staff Forwarded By:', textStartX, approvalBoxY + 20);
+    doc.fillColor('#111827').font('Helvetica-Bold').fontSize(11).text(leaveRequest.forwardedBy || 'Department Staff', textStartX + labelWidth, approvalBoxY + 20);
 
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(14).text('SECURE DIGITAL AUTHORIZATION', 45, bottomBlockY);
+    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('HOD Status:', textStartX, approvalBoxY + 50);
+    doc.fillColor('#059669').font('Helvetica-Bold').fontSize(22).text('APPROVED', textStartX + labelWidth, approvalBoxY + 45, { underline: true });
 
-    doc.y = bottomBlockY + 30;
-    doc.fillColor('#374151').font('Helvetica').fontSize(9.5).text('This document is electronically generated and officially verified by the Agni College of Technology institutional portal. Validity can be verified by scanning the Doc-Verify QR code.', 45, doc.y, { width: 380, lineGap: 2 });
+    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('Approved Timestamp:', textStartX, approvalBoxY + 80);
+    doc.fillColor('#111827').font('Helvetica').fontSize(10).text(new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), textStartX + labelWidth, approvalBoxY + 80);
 
-    doc.moveDown(1);
-    doc.fillColor(textColor).font('Helvetica-Bold').fontSize(9);
-    doc.text(`VERIFIED BY: ${leaveRequest.forwardedBy || 'Department Staff'}`, 45);
-    doc.text(`AUTHORIZED BY: HEAD OF DEPARTMENT`, 45);
-    doc.text(`TIMESTAMP: ${new Date().toLocaleString('en-IN')}`, 45);
+    // QR Code Section (Vertical line and QR)
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).moveTo(430, approvalBoxY).lineTo(430, approvalBoxY + approvalBoxHeight).stroke();
 
-    // --- Branded QR Code ---
     try {
-        const qrX = 460;
-        const qrY = bottomBlockY + 5;
-        const qrSize = 85;
-
-        doc.image(qrBuffer, qrX, qrY, { width: qrSize });
-
-        // Add Attendanzy branding box in the center of QR
-        const boxSize = 20;
-        doc.save();
-        doc.fillColor('white').rect(qrX + (qrSize / 2) - (boxSize / 2), qrY + (qrSize / 2) - (boxSize / 2), boxSize, boxSize).fill();
-        doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(6).text('ATZ', qrX + (qrSize / 2) - (boxSize / 2), qrY + (qrSize / 2) - 2, { width: boxSize, align: 'center' });
-        doc.restore();
-
-        doc.fillColor('#6B7280').font('Helvetica-Bold').fontSize(7).text('DOC-VERIFY QR', qrX, qrY + qrSize + 5, { width: qrSize, align: 'center' });
+        doc.image(qrBuffer, 445, approvalBoxY + 10, { width: 85 });
+        doc.fillColor('#6B7280').font('Helvetica-Oblique').fontSize(8).text('Scan to Verify', 445, approvalBoxY + 82, { width: 85, align: 'center' });
     } catch (e) { }
 
-    // Security Footer
-    doc.strokeColor('#E5E7EB').lineWidth(1).moveTo(40, 805).lineTo(555, 805).stroke();
-    doc.fillColor('#9CA3AF').font('Helvetica').fontSize(8).text('System generated secure document | ACT-Attendanzy Portal | CID: ' + (leaveRequest._id.toString().substring(0, 8)), 40, 812, { width: 515, align: 'center' });
+    // --- Footer ---
+    doc.y = 780;
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(1, { space: 1 }).moveTo(70, 785).lineTo(150, 785).stroke().undash();
+    doc.fillColor('#6B7280').font('Helvetica').fontSize(7.5).text(`Secure Verification URL: ${verificationUrl}`, 155, 782, { width: 320, align: 'center' });
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(1, { space: 1 }).moveTo(480, 785).lineTo(540, 785).stroke().undash();
 
     doc.end();
 
@@ -175,10 +166,7 @@ exports.submitLeaveRequest = async (req, res) => {
         await leaveRequest.save();
         try { await notifyStaffOnNewRequest(leaveRequest, 'Leave'); } catch (notifError) { console.error('Notification error:', notifError); }
         res.status(201).json({ success: true, message: 'Leave request submitted successfully', data: leaveRequest });
-    } catch (error) {
-        console.error('Submit leave request error:', error);
-        res.status(500).json({ success: false, message: 'Failed to submit leave request', error: error.message });
-    }
+    } catch (error) { res.status(500).json({ success: false, message: 'Failed to submit', error: error.message }); }
 };
 
 exports.getStudentLeaveRequests = async (req, res) => {
@@ -186,7 +174,7 @@ exports.getStudentLeaveRequests = async (req, res) => {
         const { email } = req.params;
         const requests = await LeaveRequest.find({ studentEmail: email }).sort({ createdAt: -1 });
         res.status(200).json({ success: true, count: requests.length, requests: requests });
-    } catch (error) { res.status(500).json({ success: false, message: 'Failed to fetch leave requests', error: error.message }); }
+    } catch (error) { res.status(500).json({ success: false, message: 'Failed to fetch', error: error.message }); }
 };
 
 exports.getStaffLeaveRequests = async (req, res) => {
@@ -198,7 +186,7 @@ exports.getStaffLeaveRequests = async (req, res) => {
         if (section) query.section = section;
         const requests = await LeaveRequest.find(query).sort({ createdAt: -1 });
         res.status(200).json({ success: true, count: requests.length, data: requests });
-    } catch (error) { res.status(500).json({ success: false, message: 'Failed to fetch leave requests', error: error.message }); }
+    } catch (error) { res.status(500).json({ success: false, message: 'Failed to fetch', error: error.message }); }
 };
 
 exports.getHODLeaveRequests = async (req, res) => {
@@ -208,7 +196,7 @@ exports.getHODLeaveRequests = async (req, res) => {
         if (department) query.department = department;
         const requests = await LeaveRequest.find(query).sort({ createdAt: -1 });
         res.status(200).json({ success: true, count: requests.length, data: requests });
-    } catch (error) { res.status(500).json({ success: false, message: 'Failed to fetch leave requests', error: error.message }); }
+    } catch (error) { res.status(500).json({ success: false, message: 'Failed to fetch', error: error.message }); }
 };
 
 exports.updateStaffStatus = async (req, res) => {
@@ -217,7 +205,7 @@ exports.updateStaffStatus = async (req, res) => {
         const { status, rejectionReason, staffName, inchargeName, year, section } = req.body;
         let dbStatus = status === 'accepted' ? 'approved' : status;
         const leaveRequest = await LeaveRequest.findById(id);
-        if (!leaveRequest) return res.status(404).json({ success: false, message: 'Leave request not found' });
+        if (!leaveRequest) return res.status(404).json({ success: false, message: 'Not found' });
         leaveRequest.staffStatus = dbStatus;
         leaveRequest.updatedAt = new Date().toISOString();
         if (dbStatus === 'rejected') {
@@ -237,7 +225,7 @@ exports.updateStaffStatus = async (req, res) => {
             try { await notifyStudentOnStatusChange(leaveRequest, 'Leave', 'forwarded', 'staff'); } catch (e) { }
         }
         await leaveRequest.save();
-        res.status(200).json({ success: true, message: `Leave request ${dbStatus} by staff`, data: leaveRequest });
+        res.status(200).json({ success: true, message: `Updated`, data: leaveRequest });
     } catch (error) { res.status(500).json({ success: false, message: 'Update failed', error: error.message }); }
 };
 
@@ -246,7 +234,7 @@ exports.updateHODStatus = async (req, res) => {
         const { id } = req.params;
         const { status, remarks } = req.body;
         const leaveRequest = await LeaveRequest.findById(id);
-        if (!leaveRequest) return res.status(404).json({ success: false, message: 'Leave request not found' });
+        if (!leaveRequest) return res.status(404).json({ success: false, message: 'Not found' });
         leaveRequest.hodStatus = status;
         if (remarks) leaveRequest.hodRemarks = remarks;
         const isApproved = status && (status.toLowerCase() === 'approved' || status.toLowerCase() === 'accepted');
@@ -258,7 +246,7 @@ exports.updateHODStatus = async (req, res) => {
         }
         await leaveRequest.save();
         try { await notifyStudentOnStatusChange(leaveRequest, 'Leave', status, 'hod'); } catch (e) { }
-        res.status(200).json({ success: true, message: `Leave request ${status} by HOD`, data: leaveRequest });
+        res.status(200).json({ success: true, message: `Updated`, data: leaveRequest });
     } catch (error) { res.status(500).json({ success: false, message: 'Update failed', error: error.message }); }
 };
 
@@ -297,13 +285,9 @@ exports.updateLeaveRequest = async (req, res) => {
         const updateData = req.body;
         const existing = await LeaveRequest.findById(id);
         if (!existing) return res.status(404).json({ success: false, message: 'Not found' });
-        if (existing.status !== 'pending' && existing.staffStatus !== 'pending') {
-            return res.status(400).json({ success: false, message: 'Cannot edit processed request' });
-        }
+        if (existing.status !== 'pending' && existing.staffStatus !== 'pending') return res.status(400).json({ success: false, message: 'Cannot edit' });
         const updates = { updatedAt: new Date().toISOString() };
-        ['subject', 'content', 'reason', 'leaveType', 'fromDate', 'toDate', 'duration', 'image'].forEach(f => {
-            if (updateData[f] !== undefined) updates[f] = updateData[f];
-        });
+        ['subject', 'content', 'reason', 'leaveType', 'fromDate', 'toDate', 'duration', 'image'].forEach(f => { if (updateData[f] !== undefined) updates[f] = updateData[f]; });
         const leaveRequest = await LeaveRequest.findByIdAndUpdate(id, updates, { new: true });
         res.status(200).json({ success: true, message: 'Updated', data: leaveRequest });
     } catch (error) { res.status(500).json({ success: false, message: 'Update failed', error: error.message }); }
@@ -313,53 +297,9 @@ exports.verifyLeave = async (req, res) => {
     try {
         const { leaveId } = req.params;
         const leave = await LeaveRequest.findOne({ leaveId });
-        if (!leave) return res.status(404).send('<h1 style="color:#ef4444;text-align:center;padding:50px;font-family:sans-serif;">INVALID DOCUMENT ❌<br><small style="color:#6b7280;">This record does not exist in the institutional database.</small></h1>');
-
-        res.send(`
-        <html>
-        <head>
-            <title>Secure Verification | Attendanzy</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                body { font-family: 'Inter', -apple-system, sans-serif; background: #f9fafb; margin: 0; padding: 20px; color: #111827; }
-                .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #e5e7eb; }
-                .banner { background: #059669; color: white; padding: 30px; text-align: center; }
-                .banner h1 { margin: 0; font-size: 24px; letter-spacing: -0.5px; }
-                .content { padding: 40px; }
-                .status-badge { display: inline-flex; align-items: center; background: #ecfdf5; color: #059669; padding: 10px 20px; border-radius: 100px; font-weight: 700; font-size: 14px; margin-bottom: 30px; }
-                .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
-                .field { margin-bottom: 25px; }
-                .label { font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
-                .value { font-size: 16px; font-weight: 500; color: #111827; }
-                .footer { padding: 20px; background: #f3f4f6; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #e5e7eb; }
-                @media (max-width: 480px) { .grid { grid-template-columns: 1fr; gap: 15px; } }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="banner">
-                    <h1>Agni College of Technology</h1>
-                </div>
-                <div class="content">
-                    <div style="text-align: center;">
-                        <div class="status-badge">✓ OFFICIALLY VERIFIED LEAVE RECORD</div>
-                    </div>
-                    <div class="grid">
-                        <div class="field"><div class="label">Reference ID</div><div class="value">${leave.leaveId}</div></div>
-                        <div class="field"><div class="label">Date Issued</div><div class="value">${new Date(leave.updatedAt).toLocaleDateString()}</div></div>
-                        <div class="field"><div class="label">Student Name</div><div class="value">${leave.studentName}</div></div>
-                        <div class="field"><div class="label">Register No</div><div class="value">${leave.studentEmail.split('@')[0].toUpperCase()}</div></div>
-                        <div class="field"><div class="label">Leave Duration</div><div class="value">${leave.duration} Day(s)</div></div>
-                        <div class="field"><div class="label">Valid Dates</div><div class="value">${leave.fromDate} to ${leave.toDate}</div></div>
-                        <div class="field" style="grid-column: 1 / -1;"><div class="label">Verified By</div><div class="value">HOD, Dept of ${leave.department}</div></div>
-                    </div>
-                </div>
-                <div class="footer">Attendanzy Secure Document Verification Gateway | ACT-Portal</div>
-            </div>
-        </body>
-        </html>
-        `);
-    } catch (e) { res.status(500).send("Verification Gateway Error"); }
+        if (!leave) return res.status(404).send('<h1 style="color:#ef4444;text-align:center;padding:50px;font-family:sans-serif;">INVALID RECORD ❌</h1>');
+        res.send(`<html><head><title>Verify</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{font-family:sans-serif;background:#f9fafb;margin:0;padding:20px;}.container{max-width:500px;margin:0 auto;background:white;border-radius:15px;box-shadow:0 10px 30px rgba(0,0,0,0.05);overflow:hidden;border:1px solid #e5e7eb;}.header{background:#059669;color:white;padding:20px;text-align:center;}.content{padding:30px;}.field{margin-bottom:15px;}.label{font-size:11px;color:#6b7280;text-transform:uppercase;font-weight:bold;}.value{font-size:15px;color:#111827;}</style></head><body><div class="container"><div class="header"><h3>ACT Verification Portal</h3></div><div class="content"><div style="text-align:center;margin-bottom:20px;color:#059669;font-weight:bold;">✓ VALID LEAVE RECORD</div><div class="field"><div class="label">ID</div><div class="value">${leave.leaveId}</div></div><div class="field"><div class="label">Student</div><div class="value">${leave.studentName}</div></div><div class="field"><div class="label">Duration</div><div class="value">${leave.duration} Day(s)</div></div><div class="field"><div class="label">Dates</div><div class="value">${leave.fromDate} to ${leave.toDate}</div></div></div><div style="text-align:center;padding:15px;background:#f3f4f6;font-size:10px;color:#9ca3af;">Attendanzy Institutional Security</div></div></body></html>`);
+    } catch (e) { res.status(500).send("Error"); }
 };
 
 exports.downloadLeavePDF = async (req, res) => {
@@ -369,13 +309,7 @@ exports.downloadLeavePDF = async (req, res) => {
         else if (id && id.startsWith('"')) id = id.slice(1, -1);
         const leave = await LeaveRequest.findById(id);
         if (!leave) return res.status(404).json({ success: false, message: 'Not found' });
-
-        if (leave.status === 'accepted') {
-            await generateLeavePDFHelper(leave);
-        } else if (!leave.leaveId || !fs.existsSync(path.join(__dirname, '../letters', `${leave.leaveId}.pdf`))) {
-            return res.status(404).json({ success: false, message: 'PDF not available' });
-        }
-
+        if (leave.status === 'accepted') await generateLeavePDFHelper(leave);
         res.download(path.join(__dirname, '../letters', `${leave.leaveId}.pdf`), `Leave_${leave.studentName.replace(/\s+/g, '_')}.pdf`);
     } catch (error) { res.status(500).json({ success: false, message: 'Download failed', error: error.message }); }
 };

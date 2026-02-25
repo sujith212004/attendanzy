@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Helper to generate Secure OD ID and PDF (Strict One-Page Memorandum Style)
+ * Helper to generate Secure OD ID and PDF (Exact Image Match Layout)
  */
 const generateODPDFHelper = async (odRequest) => {
     if (!odRequest.odId) {
@@ -21,11 +21,7 @@ const generateODPDFHelper = async (odRequest) => {
     const verificationUrl = `${baseUrl}/api/od-requests/verify/${odId}`;
     odRequest.verificationUrl = verificationUrl;
 
-    const qrBuffer = await QRCode.toBuffer(verificationUrl, {
-        margin: 1,
-        width: 300,
-        errorCorrectionLevel: 'H'
-    });
+    const qrBuffer = await QRCode.toBuffer(verificationUrl, { margin: 1, width: 250 });
 
     const lettersDir = path.join(__dirname, '../letters');
     if (!fs.existsSync(lettersDir)) {
@@ -41,110 +37,96 @@ const generateODPDFHelper = async (odRequest) => {
     const stream = fs.createWriteStream(pdfPath);
     doc.pipe(stream);
 
-    const textColor = '#111827';
-    const accentColor = '#2563EB'; // Blue for OD
     const logoPath = path.join(__dirname, '../assets/logo.jpg');
 
-    // --- Background Watermark ---
+    // --- Header Section ---
     if (fs.existsSync(logoPath)) {
-        doc.save();
-        doc.opacity(0.05);
-        doc.image(logoPath, 147, 280, { width: 300 });
-        doc.restore();
+        doc.image(logoPath, 50, 45, { width: 70 });
     }
 
-    // --- Institutional Letterhead ---
-    if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, 45, 40, { width: 60 });
-    }
+    doc.fillColor('#1F2937').font('Helvetica-Bold').fontSize(18).text('AGNI COLLEGE OF TECHNOLOGY', 130, 60);
+    doc.font('Helvetica-Bold').fontSize(8.5).text('An Autonomous Institution | Affiliated to Anna University', 130, 82, { align: 'center', width: 400 });
+    doc.font('Helvetica').fontSize(8.5).text('OMR, Thalambur, Chennai - 603103', 130, 94, { align: 'center', width: 400 });
 
-    doc.fillColor(textColor).font('Helvetica-Bold').fontSize(18).text('AGNI COLLEGE OF TECHNOLOGY', 115, 42);
-    doc.font('Helvetica-Bold').fontSize(8.5).text('An AUTONOMOUS Institution | ISO 9001:2015 Certified', 115, 62);
-    doc.font('Helvetica').fontSize(8.5).text('Affiliated to Anna University | Approved by AICTE', 115, 74);
-    doc.text('OMR, Thalambur, Chennai - 603 103, Tamil Nadu, India', 115, 86);
-    doc.strokeColor('#000000').lineWidth(1.5).moveTo(40, 110).lineTo(555, 110).stroke();
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).moveTo(50, 52).lineTo(545, 52).stroke();
+    doc.strokeColor('#D1D5DB').lineWidth(1.5).moveTo(50, 115).lineTo(545, 115).stroke();
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).moveTo(50, 119).lineTo(545, 119).stroke();
 
-    // Ref and Date
-    doc.y = 130;
-    const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    doc.font('Helvetica-Bold').fontSize(10).text(`Ref No: OD/${odId}`, 45, 130);
-    doc.text(`Date: ${today}`, 440, 130, { align: 'right' });
+    // --- Title ---
+    doc.y = 135;
+    doc.fillColor('#111827').font('Helvetica-Bold').fontSize(14).text('STUDENT OD APPROVAL MEMORANDUM', 50, 135, { align: 'center' });
 
-    doc.moveDown(3);
+    // --- Data Table ---
+    const tableTop = 165;
+    const col1Width = 130;
+    const tableWidth = 495;
+    const rowHeight = 22;
+    const rows = [
+        ['Reference ID:', odId],
+        ['Student Name:', odRequest.studentName],
+        ['Register Number:', odRequest.studentEmail.split('@')[0].toUpperCase()],
+        ['Department:', odRequest.department],
+        ['Year / Section:', `${odRequest.year} / ${odRequest.section}`],
+        ['Activity / Sub:', odRequest.subject],
+        ['Activity Period:', `${odRequest.from} to ${odRequest.to}`],
+        ['Status Title:', 'Official On-Duty (OD)']
+    ];
 
-    // --- "From" Section ---
-    doc.font('Helvetica-Bold').fontSize(11).text('FROM:', 45);
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(11);
-    const fromText = odRequest.from || `${odRequest.studentName}\nDepartment of ${odRequest.department}\n${odRequest.year}-${odRequest.section}`;
-    doc.text(fromText, 75, doc.y, { lineGap: 3 });
+    rows.forEach((row, i) => {
+        const y = tableTop + (i * rowHeight);
+        doc.fillColor('#F9FAFB').rect(50, y, col1Width, rowHeight).fill();
+        doc.strokeColor('#D1D5DB').lineWidth(0.5).rect(50, y, tableWidth, rowHeight).stroke();
+        doc.fillColor('#374151').font('Helvetica').fontSize(10).text(row[0], 65, y + 7);
+        doc.fillColor('#111827').font('Helvetica-Bold').fontSize(10).text(row[1], 50 + col1Width + 15, y + 7);
+    });
 
-    doc.moveDown(2);
+    // --- Reason Section ---
+    const reasonTop = tableTop + (rows.length * rowHeight) + 25;
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(2, { space: 2 }).moveTo(50, reasonTop).lineTo(180, reasonTop).stroke().undash();
+    doc.fillColor('#4B5563').font('Helvetica-BoldOblique').fontSize(10).text('Reason for On-Duty', 185, reasonTop - 5, { width: 175, align: 'center' });
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(2, { space: 2 }).moveTo(365, reasonTop).lineTo(545, reasonTop).stroke().undash();
 
-    // --- "To" Section ---
-    doc.font('Helvetica-Bold').fontSize(11).text('TO:', 45);
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(11);
-    const toText = odRequest.to || `The Head of Department,\nDepartment of ${odRequest.department},\nAgni College of Technology.`;
-    doc.text(toText, 75, doc.y, { lineGap: 3 });
+    const reasonBoxY = reasonTop + 15;
+    const reasonContent = odRequest.content || odRequest.reason || 'No specific reason provided.';
 
-    doc.moveDown(3);
+    doc.strokeColor('#9CA3AF').lineWidth(0.5).rect(50, reasonBoxY, tableWidth, 50).stroke();
+    doc.strokeColor('#E5E7EB').lineWidth(1).rect(55, reasonBoxY + 5, tableWidth - 10, 40).stroke();
+    doc.fillColor('#111827').font('Helvetica').fontSize(10.5).text(reasonContent, 65, reasonBoxY + 18, { width: 465, align: 'center' });
 
-    // --- Subject Line ---
-    doc.font('Helvetica-Bold').fontSize(11.5).text(`Subject: ${odRequest.subject.toUpperCase()} - REGARDING.`, 45, doc.y, { underline: true });
+    // --- Digital Approval Workflow ---
+    const approvalTop = reasonBoxY + 75;
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(2, { space: 2 }).moveTo(50, approvalTop).lineTo(150, approvalTop).stroke().undash();
+    doc.fillColor('#4B5563').font('Helvetica-Bold').fontSize(10).text('DIGITAL APPROVAL WORKFLOW', 155, approvalTop - 5, { width: 235, align: 'center' });
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(2, { space: 2 }).moveTo(395, approvalTop).lineTo(545, approvalTop).stroke().undash();
 
-    doc.moveDown(4);
+    const approvalBoxY = approvalTop + 15;
+    const approvalBoxHeight = 100;
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).rect(50, approvalBoxY, tableWidth, approvalBoxHeight).stroke();
 
-    // --- Body Section ---
-    doc.font('Helvetica').fontSize(12).text('Respected Sir/Madam,', 45);
-    doc.moveDown(1.5);
+    const textStartX = 65;
+    const labelWidth = 110;
 
-    const mainContent = odRequest.content || odRequest.reason || 'Requested On-Duty authorization.';
-    doc.text(mainContent, 45, doc.y, { align: 'justify', lineGap: 5, width: 505 });
+    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('Staff Forwarded By:', textStartX, approvalBoxY + 20);
+    doc.fillColor('#111827').font('Helvetica-Bold').fontSize(11).text(odRequest.forwardedBy || 'Department Staff', textStartX + labelWidth, approvalBoxY + 20);
 
-    doc.moveDown(5);
-    doc.text('Thanking you,', 45);
+    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('HOD Status:', textStartX, approvalBoxY + 50);
+    doc.fillColor('#2563EB').font('Helvetica-Bold').fontSize(22).text('APPROVED', textStartX + labelWidth, approvalBoxY + 45, { underline: true });
 
-    doc.moveDown(4);
-    doc.font('Helvetica-Bold').text('Yours obediently,', 380);
-    doc.moveDown(0.4);
-    doc.text(odRequest.studentName.toUpperCase(), 380);
+    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('Approved Timestamp:', textStartX, approvalBoxY + 80);
+    doc.fillColor('#111827').font('Helvetica').fontSize(10).text(new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), textStartX + labelWidth, approvalBoxY + 80);
 
-    // --- High-Fidelity Authorization Area ---
-    const bottomBlockY = 665;
-    doc.strokeColor('#111827').lineWidth(2).moveTo(40, bottomBlockY - 20).lineTo(555, bottomBlockY - 20).stroke();
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).moveTo(430, approvalBoxY).lineTo(430, approvalBoxY + approvalBoxHeight).stroke();
 
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(14).text('SECURE OFFICIAL AUTHORIZATION', 45, bottomBlockY);
-
-    doc.y = bottomBlockY + 30;
-    doc.fillColor('#374151').font('Helvetica').fontSize(9.5).text('This On-Duty (OD) authorization is electronically verified. The department confirms the student\'s involvement in the aforementioned activity for the specified duration.', 45, doc.y, { width: 380, lineGap: 2 });
-
-    doc.moveDown(1);
-    doc.fillColor(textColor).font('Helvetica-Bold').fontSize(9.5);
-    doc.text(`VERIFIED BY: ${odRequest.forwardedBy || 'Department Staff'}`, 45);
-    doc.text(`AUTHORIZED BY: HEAD OF DEPARTMENT`, 45);
-    doc.text(`TIMESTAMP: ${new Date().toLocaleString('en-IN')}`, 45);
-
-    // --- Branded QR Code ---
     try {
-        const qrX = 460;
-        const qrY = bottomBlockY + 5;
-        const qrSize = 85;
-
-        doc.image(qrBuffer, qrX, qrY, { width: qrSize });
-
-        const boxSize = 20;
-        doc.save();
-        doc.fillColor('white').rect(qrX + (qrSize / 2) - (boxSize / 2), qrY + (qrSize / 2) - (boxSize / 2), boxSize, boxSize).fill();
-        doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(6).text('ATZ', qrX + (qrSize / 2) - (boxSize / 2), qrY + (qrSize / 2) - 2, { width: boxSize, align: 'center' });
-        doc.restore();
-
-        doc.fillColor('#6B7280').font('Helvetica-Bold').fontSize(7).text('DOC-VERIFY QR', qrX, qrY + qrSize + 5, { width: qrSize, align: 'center' });
+        doc.image(qrBuffer, 445, approvalBoxY + 10, { width: 85 });
+        doc.fillColor('#6B7280').font('Helvetica-Oblique').fontSize(8).text('Scan to Verify', 445, approvalBoxY + 82, { width: 85, align: 'center' });
     } catch (e) { }
 
-    // Security Footer
-    doc.strokeColor('#E5E7EB').lineWidth(1).moveTo(40, 805).lineTo(555, 805).stroke();
-    doc.fillColor('#9CA3AF').font('Helvetica').fontSize(8).text('Electronic OD Authorization | Attendanzy Secure Portal | CID: ' + (odRequest._id.toString().substring(0, 8)), 40, 812, { width: 515, align: 'center' });
+    // --- Footer ---
+    doc.y = 780;
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(1, { space: 1 }).moveTo(70, 785).lineTo(150, 785).stroke().undash();
+    doc.fillColor('#6B7280').font('Helvetica').fontSize(7.5).text(`Secure Verification URL: ${verificationUrl}`, 155, 782, { width: 320, align: 'center' });
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(1, { space: 1 }).moveTo(480, 785).lineTo(540, 785).stroke().undash();
 
     doc.end();
 
@@ -230,7 +212,7 @@ exports.updateStaffStatus = async (req, res) => {
             try { await notifyStudentOnStatusChange(odRequest, 'OD', 'forwarded', 'staff'); } catch (e) { }
         }
         await odRequest.save();
-        res.status(200).json({ success: true, message: `Updated by staff`, data: odRequest });
+        res.status(200).json({ success: true, message: `Updated`, data: odRequest });
     } catch (error) { res.status(500).json({ success: false, message: 'Update failed', error: error.message }); }
 };
 
@@ -251,7 +233,7 @@ exports.updateHODStatus = async (req, res) => {
         }
         await odRequest.save();
         try { await notifyStudentOnStatusChange(odRequest, 'OD', status, 'hod'); } catch (e) { }
-        res.status(200).json({ success: true, message: `Updated by HOD`, data: odRequest });
+        res.status(200).json({ success: true, message: `Updated`, data: odRequest });
     } catch (error) { res.status(500).json({ success: false, message: 'Update failed', error: error.message }); }
 };
 
@@ -302,53 +284,9 @@ exports.verifyOD = async (req, res) => {
     try {
         const { odId } = req.params;
         const od = await ODRequest.findOne({ odId });
-        if (!od) return res.status(404).send('<h1 style="color:#ef4444;text-align:center;padding:50px;font-family:sans-serif;">INVALID DOCUMENT ❌<br><small style="color:#6b7280;">This record does not exist in the institutional database.</small></h1>');
-
-        res.send(`
-        <html>
-        <head>
-            <title>Secure Verification | Attendanzy</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                body { font-family: 'Inter', -apple-system, sans-serif; background: #f9fafb; margin: 0; padding: 20px; color: #111827; }
-                .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #e5e7eb; }
-                .banner { background: #2563EB; color: white; padding: 30px; text-align: center; }
-                .banner h1 { margin: 0; font-size: 24px; letter-spacing: -0.5px; }
-                .content { padding: 40px; }
-                .status-badge { display: inline-flex; align-items: center; background: #dbeafe; color: #1e40af; padding: 10px 20px; border-radius: 100px; font-weight: 700; font-size: 14px; margin-bottom: 30px; }
-                .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
-                .field { margin-bottom: 25px; }
-                .label { font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
-                .value { font-size: 16px; font-weight: 500; color: #111827; }
-                .footer { padding: 20px; background: #f3f4f6; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #e5e7eb; }
-                @media (max-width: 480px) { .grid { grid-template-columns: 1fr; gap: 15px; } }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="banner">
-                    <h1>Agni College of Technology</h1>
-                </div>
-                <div class="content">
-                    <div style="text-align: center;">
-                        <div class="status-badge">✓ OFFICIALLY VERIFIED OD RECORD</div>
-                    </div>
-                    <div class="grid">
-                        <div class="field"><div class="label">Reference ID</div><div class="value">${od.odId}</div></div>
-                        <div class="field"><div class="label">Activity Date</div><div class="value">${od.from} to ${od.to}</div></div>
-                        <div class="field"><div class="label">Student Name</div><div class="value">${od.studentName}</div></div>
-                        <div class="field"><div class="label">Register No</div><div class="value">${od.studentEmail.split('@')[0].toUpperCase()}</div></div>
-                        <div class="field" style="grid-column: 1 / -1;"><div class="label">Activity Purpose</div><div class="value">${od.subject}</div></div>
-                        <div class="field"><div class="label">Authorized By</div><div class="value">HOD, Dept of ${od.department}</div></div>
-                        <div class="field"><div class="label">Status</div><div class="value">Officially Authorized</div></div>
-                    </div>
-                </div>
-                <div class="footer">Attendanzy Secure Document Verification Gateway | ACT-Portal</div>
-            </div>
-        </body>
-        </html>
-        `);
-    } catch (e) { res.status(500).send("Verification Gateway Error"); }
+        if (!od) return res.status(404).send('<h1 style="color:#ef4444;text-align:center;padding:50px;font-family:sans-serif;">INVALID RECORD ❌</h1>');
+        res.send(`<html><head><title>Verify</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{font-family:sans-serif;background:#f9fafb;margin:0;padding:20px;}.container{max-width:500px;margin:0 auto;background:white;border-radius:15px;box-shadow:0 10px 30px rgba(0,0,0,0.05);overflow:hidden;border:1px solid #e5e7eb;}.header{background:#2563EB;color:white;padding:20px;text-align:center;}.content{padding:30px;}.field{margin-bottom:15px;}.label{font-size:11px;color:#6b7280;text-transform:uppercase;font-weight:bold;}.value{font-size:15px;color:#111827;}</style></head><body><div class="container"><div class="header"><h3>ACT Verification Portal</h3></div><div class="content"><div style="text-align:center;margin-bottom:20px;color:#2563EB;font-weight:bold;">✓ VALID OD RECORD</div><div class="field"><div class="label">ID</div><div class="value">${od.odId}</div></div><div class="field"><div class="label">Student</div><div class="value">${od.studentName}</div></div><div class="field"><div class="label">Activity</div><div class="value">${od.subject}</div></div><div class="field"><div class="label">Dates</div><div class="value">${od.from} to ${od.to}</div></div></div><div style="text-align:center;padding:15px;background:#f3f4f6;font-size:10px;color:#9ca3af;">Attendanzy Institutional Security</div></div></body></html>`);
+    } catch (e) { res.status(500).send("Error"); }
 };
 
 exports.downloadODPDF = async (req, res) => {
@@ -358,13 +296,7 @@ exports.downloadODPDF = async (req, res) => {
         else if (id && id.startsWith('"')) id = id.slice(1, -1);
         const od = await ODRequest.findById(id);
         if (!od) return res.status(404).json({ success: false, message: 'Not found' });
-
-        if (od.status === 'accepted') {
-            await generateODPDFHelper(od);
-        } else if (!od.odId || !fs.existsSync(path.join(__dirname, '../letters', `${od.odId}.pdf`))) {
-            return res.status(404).json({ success: false, message: 'PDF not available' });
-        }
-
+        if (od.status === 'accepted') await generateODPDFHelper(od);
         res.download(path.join(__dirname, '../letters', `${od.odId}.pdf`), `OD_${od.studentName.replace(/\s+/g, '_')}.pdf`);
     } catch (error) { res.status(500).json({ success: false, message: 'Download failed', error: error.message }); }
 };
