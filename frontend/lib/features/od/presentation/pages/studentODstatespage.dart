@@ -4,8 +4,9 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:mongo_dart/mongo_dart.dart' as mongo;
-import '../../../../core/services/pdf_generator_service.dart';
+import '../../../../core/services/file_service.dart';
 import '../../../../core/config/local_config.dart';
+import '../../../../core/config/api_config.dart';
 
 class StudentODStatusPage extends StatefulWidget {
   final String studentEmail;
@@ -1223,9 +1224,25 @@ class _StudentODStatusPageState extends State<StudentODStatusPage>
 
   Future<void> _downloadODRequest(Map<String, dynamic> request) async {
     try {
-      await PdfGeneratorService.generateODRequestPdf(
-        request: request,
-        studentEmail: widget.studentEmail,
+      final String? id =
+          request['_id'] is mongo.ObjectId
+              ? (request['_id'] as mongo.ObjectId).toHexString()
+              : request['_id']?.toString();
+
+      if (id == null) {
+        _showSnackBar('Invalid request ID', Colors.red);
+        return;
+      }
+
+      final String downloadUrl =
+          '${ApiConfig.baseUrl}/od-requests/$id/download';
+      final String fileName =
+          'OD_${request['studentName']?.toString().replaceAll(' ', '_') ?? 'Request'}.pdf';
+
+      await FileService.downloadAndOpenFile(
+        context: context,
+        url: downloadUrl,
+        fileName: fileName,
       );
     } catch (e) {
       _showSnackBar('Error downloading OD request: $e', Colors.red);

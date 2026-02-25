@@ -47,16 +47,21 @@ const generateODPDFHelper = async (odRequest) => {
     const accentColor = '#3B82F6'; // Blue for OD
     const textColor = '#1F2937';
 
-    // Header
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(24).text('ATTENDANZY', { align: 'center', wordSpacing: 5 });
-    doc.fillColor(textColor).font('Helvetica').fontSize(14).text('SECURE ON-DUTY (OD) APPROVAL', { align: 'center' });
+    // Header (Agni College of Technology Branding)
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(20).text('AGNI COLLEGE OF TECHNOLOGY', { align: 'center' });
+    doc.fillColor(textColor).font('Helvetica-Bold').fontSize(10).text('An AUTONOMOUS Institution', { align: 'center' });
+    doc.fillColor(textColor).font('Helvetica').fontSize(9).text('Affiliated to Anna University | Chennai - 603103', { align: 'center' });
     doc.moveDown(1);
     doc.strokeColor('#EEEEEE').lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
     doc.moveDown(1.5);
 
+    // Document Title
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(14).text('OFFICIAL ON-DUTY (OD) APPROVAL', { align: 'center', underline: true });
+    doc.moveDown(1);
+
     // Certificate of Authenticity Ribbon
     doc.rect(50, doc.y, 500, 25).fill('#F3F4F6');
-    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('OFFICIAL DOCUMENT • PROTECTED BY SECURE VERIFICATION', 60, doc.y + 7, { align: 'center' });
+    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('OFFICIAL DOCUMENT • PROTECTED BY SECURE QR VERIFICATION', 60, doc.y + 7, { align: 'center' });
     doc.moveDown(2);
 
     // Student Info Table Style
@@ -76,7 +81,7 @@ const generateODPDFHelper = async (odRequest) => {
     doc.moveDown(3);
 
     // OD Details
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('OD DETAILS', { characterSpacing: 1 });
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('ON-DUTY (OD) DETAILS', { characterSpacing: 1 });
     doc.moveDown(0.5);
 
     const detailY = doc.y;
@@ -87,8 +92,8 @@ const generateODPDFHelper = async (odRequest) => {
     doc.text('Duration:', 50, detailY + 20);
     doc.text(`${odRequest.from} to ${odRequest.to}`, 150, detailY + 20);
 
-    doc.text('Reason/Details:', 50, detailY + 40);
-    doc.text(odRequest.content, 150, detailY + 40, { width: 400 });
+    doc.text('Description:', 50, detailY + 40);
+    doc.text(odRequest.content || odRequest.reason, 150, detailY + 40, { width: 400 });
     doc.moveDown(4);
 
     // Verification Section (QR and Text)
@@ -99,7 +104,7 @@ const generateODPDFHelper = async (odRequest) => {
         console.error('QR Image error:', imgError);
     }
 
-    doc.fillColor(accentColor).fontSize(12).text('APPROVAL STATUS: VERIFIED', 50, qrY);
+    doc.fillColor(accentColor).fontSize(12).text('APPROVAL STATUS: VERIFIED ✅', 50, qrY);
     doc.fillColor('#059669').fontSize(10).text('Approved by Head of Department (HOD)', 50, qrY + 20);
     doc.fillColor('#6B7280').fontSize(8);
     doc.text(`Forwarded by: ${odRequest.forwardedBy || 'Department Staff'}`, 50, qrY + 40);
@@ -108,8 +113,8 @@ const generateODPDFHelper = async (odRequest) => {
 
     // Security Footer
     doc.moveDown(4);
-    doc.rect(50, 700, 500, 60).fill('#FEF2F2');
-    doc.fillColor('#991B1B').fontSize(9).text('SECURITY WARNING: This document contains a secure digital signature encoded in the QR code. Any modification to the names, dates, or content of this PDF will be detectable. To verify authenticity, scan the QR code or visit the verification portal below.', 60, 710, { width: 480, align: 'center' });
+    doc.rect(50, 710, 500, 50).fill('#F0FDF4');
+    doc.fillColor('#166534').fontSize(8).text('SECURITY WARNING: This document is digitally verified via QR. Any modification to the names, dates, or content of this PDF will be detectable via scanning. To verify authenticity, scan the QR code or visit the verification portal.', 60, 720, { width: 480, align: 'center' });
 
     doc.fillColor(accentColor).fontSize(8).text(verificationUrl, 50, 770, { align: 'center' });
 
