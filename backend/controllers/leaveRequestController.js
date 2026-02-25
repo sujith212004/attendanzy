@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Helper to generate Secure Leave ID and PDF (Exact Image Match Layout)
+ * Helper to generate Secure Leave ID and PDF (Strict Compressed Image Match Layout)
  */
 const generateLeavePDFHelper = async (leaveRequest) => {
     if (!leaveRequest.leaveId) {
@@ -33,107 +33,96 @@ const generateLeavePDFHelper = async (leaveRequest) => {
         try { fs.unlinkSync(pdfPath); } catch (e) { }
     }
 
-    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    // Tight margins for strict 1-page
+    const doc = new PDFDocument({ margin: 30, size: 'A4' });
     const stream = fs.createWriteStream(pdfPath);
     doc.pipe(stream);
 
     const logoPath = path.join(__dirname, '../assets/logo.jpg');
 
-    // --- Header Section (Matching Image) ---
+    // --- Header Section ---
     if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, 50, 45, { width: 70 });
+        doc.image(logoPath, 50, 35, { width: 65 });
     }
 
-    doc.fillColor('#1F2937').font('Helvetica-Bold').fontSize(18).text('AGNI COLLEGE OF TECHNOLOGY', 130, 60);
-    doc.font('Helvetica-Bold').fontSize(8.5).text('An Autonomous Institution | Affiliated to Anna University', 130, 82, { align: 'center', width: 400 });
-    doc.font('Helvetica').fontSize(8.5).text('OMR, Thalambur, Chennai - 603103', 130, 94, { align: 'center', width: 400 });
+    doc.fillColor('#1F2937').font('Helvetica-Bold').fontSize(18).text('AGNI COLLEGE OF TECHNOLOGY', 125, 45);
+    doc.font('Helvetica-Bold').fontSize(8.5).text('An Autonomous Institution | Affiliated to Anna University', 125, 65, { align: 'center', width: 400 });
+    doc.font('Helvetica').fontSize(8.5).text('OMR, Thalambur, Chennai - 603103', 125, 75, { align: 'center', width: 400 });
 
-    // Double lines below header
-    doc.strokeColor('#D1D5DB').lineWidth(0.5).moveTo(50, 52).lineTo(545, 52).stroke();
-    doc.strokeColor('#D1D5DB').lineWidth(1.5).moveTo(50, 115).lineTo(545, 115).stroke();
-    doc.strokeColor('#D1D5DB').lineWidth(0.5).moveTo(50, 119).lineTo(545, 119).stroke();
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).moveTo(50, 42).lineTo(545, 42).stroke();
+    doc.strokeColor('#D1D5DB').lineWidth(1.5).moveTo(50, 95).lineTo(545, 95).stroke();
+    doc.strokeColor('#D1D5DB').lineWidth(0.5).moveTo(50, 98).lineTo(545, 98).stroke();
 
     // --- Title ---
-    doc.y = 135;
-    doc.fillColor('#111827').font('Helvetica-Bold').fontSize(14).text('STUDENT LEAVE APPROVAL MEMORANDUM', 50, 135, { align: 'center' });
+    doc.y = 110;
+    doc.fillColor('#111827').font('Helvetica-Bold').fontSize(14).text('STUDENT LEAVE APPROVAL MEMORANDUM', 50, 110, { align: 'center' });
 
     // --- Data Table (Grid) ---
-    const tableTop = 165;
+    const tableTop = 135;
     const col1Width = 130;
     const tableWidth = 495;
     const rowHeight = 22;
     const rows = [
         ['Reference ID:', leaveId],
         ['Student Name:', leaveRequest.studentName],
-        ['Register Number:', leaveRequest.studentEmail.split('@')[0].toUpperCase()],
+        ['Student Email:', leaveRequest.studentEmail],
         ['Department:', leaveRequest.department],
         ['Year / Section:', `${leaveRequest.year} / ${leaveRequest.section}`],
         ['Leave Type:', leaveRequest.leaveType],
-        ['Leave Period:', `${leaveRequest.fromDate} to ${leaveRequest.toDate}`],
         ['Total Days:', `${leaveRequest.duration} Day(s)`]
     ];
 
     rows.forEach((row, i) => {
         const y = tableTop + (i * rowHeight);
-
-        // Background for labels
         doc.fillColor('#F9FAFB').rect(50, y, col1Width, rowHeight).fill();
-
-        // Borders
-        doc.strokeColor('#D1D5DB').lineWidth(0.5)
-            .rect(50, y, tableWidth, rowHeight).stroke();
-
-        // Text
+        doc.strokeColor('#D1D5DB').lineWidth(0.5).rect(50, y, tableWidth, rowHeight).stroke();
         doc.fillColor('#374151').font('Helvetica').fontSize(10).text(row[0], 65, y + 7);
         doc.fillColor('#111827').font('Helvetica-Bold').fontSize(10).text(row[1], 50 + col1Width + 15, y + 7);
     });
 
     // --- Reason Section ---
-    const reasonTop = tableTop + (rows.length * rowHeight) + 25;
+    const reasonTop = tableTop + (rows.length * rowHeight) + 20;
     doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(2, { space: 2 }).moveTo(50, reasonTop).lineTo(180, reasonTop).stroke().undash();
     doc.fillColor('#4B5563').font('Helvetica-BoldOblique').fontSize(10).text('Reason for Leave', 185, reasonTop - 5, { width: 175, align: 'center' });
     doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(2, { space: 2 }).moveTo(365, reasonTop).lineTo(545, reasonTop).stroke().undash();
 
-    const reasonBoxY = reasonTop + 15;
+    const reasonBoxY = reasonTop + 10;
     const reasonContent = leaveRequest.content || leaveRequest.reason || 'No specific reason provided.';
 
-    doc.strokeColor('#9CA3AF').lineWidth(0.5).rect(50, reasonBoxY, tableWidth, 50).stroke();
-    doc.strokeColor('#E5E7EB').lineWidth(1).rect(55, reasonBoxY + 5, tableWidth - 10, 40).stroke();
-    doc.fillColor('#111827').font('Helvetica').fontSize(10.5).text(reasonContent, 65, reasonBoxY + 18, { width: 465, align: 'center' });
+    doc.strokeColor('#9CA3AF').lineWidth(0.5).rect(50, reasonBoxY, tableWidth, 45).stroke();
+    doc.strokeColor('#E5E7EB').lineWidth(1).rect(55, reasonBoxY + 3, tableWidth - 10, 39).stroke();
+    doc.fillColor('#111827').font('Helvetica').fontSize(10.5).text(reasonContent, 65, reasonBoxY + 16, { width: 465, align: 'center' });
 
     // --- Digital Approval Workflow ---
-    const approvalTop = reasonBoxY + 75;
+    const approvalTop = reasonBoxY + 65;
     doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(2, { space: 2 }).moveTo(50, approvalTop).lineTo(150, approvalTop).stroke().undash();
     doc.fillColor('#4B5563').font('Helvetica-Bold').fontSize(10).text('DIGITAL APPROVAL WORKFLOW', 155, approvalTop - 5, { width: 235, align: 'center' });
     doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(2, { space: 2 }).moveTo(395, approvalTop).lineTo(545, approvalTop).stroke().undash();
 
-    const approvalBoxY = approvalTop + 15;
-    const approvalBoxHeight = 100;
+    const approvalBoxY = approvalTop + 10;
+    const approvalBoxHeight = 90;
     doc.strokeColor('#D1D5DB').lineWidth(0.5).rect(50, approvalBoxY, tableWidth, approvalBoxHeight).stroke();
 
-    // Approval Text Section
     const textStartX = 65;
     const labelWidth = 110;
 
-    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('Staff Forwarded By:', textStartX, approvalBoxY + 20);
-    doc.fillColor('#111827').font('Helvetica-Bold').fontSize(11).text(leaveRequest.forwardedBy || 'Department Staff', textStartX + labelWidth, approvalBoxY + 20);
+    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('Staff Forwarded By:', textStartX, approvalBoxY + 15);
+    doc.fillColor('#111827').font('Helvetica-Bold').fontSize(11).text(leaveRequest.forwardedBy || 'Department Staff', textStartX + labelWidth, approvalBoxY + 15);
 
-    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('HOD Status:', textStartX, approvalBoxY + 50);
-    doc.fillColor('#059669').font('Helvetica-Bold').fontSize(22).text('APPROVED', textStartX + labelWidth, approvalBoxY + 45, { underline: true });
+    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('HOD Status:', textStartX, approvalBoxY + 40);
+    doc.fillColor('#059669').font('Helvetica-Bold').fontSize(22).text('APPROVED', textStartX + labelWidth, approvalBoxY + 35, { underline: true });
 
-    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('Approved Timestamp:', textStartX, approvalBoxY + 80);
-    doc.fillColor('#111827').font('Helvetica').fontSize(10).text(new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), textStartX + labelWidth, approvalBoxY + 80);
+    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('Approved Timestamp:', textStartX, approvalBoxY + 70);
+    doc.fillColor('#111827').font('Helvetica').fontSize(10).text(new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), textStartX + labelWidth, approvalBoxY + 70);
 
-    // QR Code Section (Vertical line and QR)
     doc.strokeColor('#D1D5DB').lineWidth(0.5).moveTo(430, approvalBoxY).lineTo(430, approvalBoxY + approvalBoxHeight).stroke();
 
     try {
-        doc.image(qrBuffer, 445, approvalBoxY + 10, { width: 85 });
-        doc.fillColor('#6B7280').font('Helvetica-Oblique').fontSize(8).text('Scan to Verify', 445, approvalBoxY + 82, { width: 85, align: 'center' });
+        doc.image(qrBuffer, 445, approvalBoxY + 5, { width: 80 });
+        doc.fillColor('#6B7280').font('Helvetica-Oblique').fontSize(8).text('Scan to Verify', 445, approvalBoxY + 78, { width: 80, align: 'center' });
     } catch (e) { }
 
     // --- Footer ---
-    doc.y = 780;
     doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(1, { space: 1 }).moveTo(70, 785).lineTo(150, 785).stroke().undash();
     doc.fillColor('#6B7280').font('Helvetica').fontSize(7.5).text(`Secure Verification URL: ${verificationUrl}`, 155, 782, { width: 320, align: 'center' });
     doc.strokeColor('#D1D5DB').lineWidth(0.5).dash(1, { space: 1 }).moveTo(480, 785).lineTo(540, 785).stroke().undash();
