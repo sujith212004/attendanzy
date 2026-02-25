@@ -29,6 +29,11 @@ const generateLeavePDFHelper = async (leaveRequest) => {
     }
 
     const pdfPath = path.join(lettersDir, `${leaveId}.pdf`);
+    // Delete existing PDF to ensure fresh generation with new design
+    if (fs.existsSync(pdfPath)) {
+        try { fs.unlinkSync(pdfPath); } catch (e) { }
+    }
+
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
     const stream = fs.createWriteStream(pdfPath);
     doc.pipe(stream);
@@ -40,8 +45,8 @@ const generateLeavePDFHelper = async (leaveRequest) => {
     // --- Background Watermark ---
     if (fs.existsSync(logoPath)) {
         doc.save();
-        doc.opacity(0.1);
-        doc.image(logoPath, 150, 300, { width: 300 });
+        doc.opacity(0.06); // Extremely subtle watermark
+        doc.image(logoPath, 125, 250, { width: 350 });
         doc.restore();
     }
 
@@ -56,67 +61,78 @@ const generateLeavePDFHelper = async (leaveRequest) => {
     doc.text('OMR, Thalambur, Chennai - 603 103, Tamil Nadu, India', 115, 82);
     doc.strokeColor('#333333').lineWidth(1).moveTo(50, 105).lineTo(545, 105).stroke();
 
-    doc.y = 120;
+    // Ref and Date (More Margin)
+    doc.y = 135;
     const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    doc.font('Helvetica-Bold').fontSize(9).text(`Ref: ACT/LV/${leaveId}`, 50, 120);
-    doc.text(`Date: ${today}`, 450, 120, { align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(9).text(`Ref: ACT/LV/${leaveId}`, 50, 135);
+    doc.text(`Date: ${today}`, 450, 135, { align: 'right' });
 
-    doc.moveDown(3);
+    // Vertical distribution start
+    doc.moveDown(5);
+
+    // --- "From" Section ---
     doc.font('Helvetica-Bold').fontSize(10).text('From,', 50);
+    doc.moveDown(0.5);
     doc.font('Helvetica').fontSize(10);
-    doc.text(`${leaveRequest.studentName.toUpperCase()},`, 70);
-    doc.text(`${leaveRequest.studentEmail.split('@')[0].toUpperCase()}, ${leaveRequest.year} Year / ${leaveRequest.section},`, 70);
-    doc.text(`Department of ${leaveRequest.department || 'Engineering'}, Agni College of Technology.`, 70);
+    const fromText = leaveRequest.from || `${leaveRequest.studentName}\nDepartment of ${leaveRequest.department}\n${leaveRequest.year}-${leaveRequest.section}`;
+    doc.text(fromText, 75, doc.y, { lineGap: 3 });
 
-    doc.moveDown(2);
-    doc.font('Helvetica-Bold').fontSize(10).text('To,', 50);
-    doc.font('Helvetica').fontSize(10);
-    doc.text('The Head of Department,', 70);
-    doc.text(`Department of ${leaveRequest.department || 'Engineering'}, Agni College of Technology.`, 70);
-
-    doc.moveDown(2);
-    doc.font('Helvetica-Bold').fontSize(10).text('Through:', 50);
-    doc.font('Helvetica').fontSize(10).text('The Class In-charge / Staff Advisor.', 70);
-
-    doc.moveDown(3);
-    doc.font('Helvetica-Bold').fontSize(10).text(`Subject: Official Request for ${leaveRequest.leaveType || 'Leave'} Authorization - Regarding.`, 50, doc.y, { underline: true });
-
-    doc.moveDown(3.5);
-    doc.font('Helvetica').fontSize(11).text('Respected Sir/Madam,', 50);
-    doc.moveDown(1.5);
-    const bodyContent = `I am writing this to formally request your approval for ${leaveRequest.duration} day[s] of leave, spanning from ${leaveRequest.fromDate} to ${leaveRequest.toDate}. This request is necessitated by ${leaveRequest.subject.toLowerCase()}, as detailed in the statement of purpose below.`;
-    doc.text(bodyContent, 50, doc.y, { align: 'justify', lineGap: 4 });
-
-    doc.moveDown(1.5);
-    doc.font('Helvetica-Bold').fontSize(10).text('Statement of Purpose / Detailed Reason:', 50);
-    doc.font('Helvetica').fontSize(10).text(leaveRequest.reason || leaveRequest.content || 'N/A', 60, doc.y + 4, { width: 485, align: 'justify', lineGap: 2 });
-
-    doc.moveDown(3.5);
-    doc.text('I assure you that I will make up for the academic hours missed during this period. I request you to kindly grant me permission for the same.', 50, doc.y, { align: 'justify' });
-    doc.moveDown(2.5);
-    doc.text('Thanking you,', 50);
     doc.moveDown(4);
+
+    // --- "To" Section ---
+    doc.font('Helvetica-Bold').fontSize(10).text('To,', 50);
+    doc.moveDown(0.5);
+    doc.font('Helvetica').fontSize(10);
+    const toText = leaveRequest.to || `The Head of Department,\nDepartment of ${leaveRequest.department},\nAgni College of Technology.`;
+    doc.text(toText, 75, doc.y, { lineGap: 3 });
+
+    doc.moveDown(6);
+
+    // --- Subject Line ---
+    doc.font('Helvetica-Bold').fontSize(11).text(`Subject: ${leaveRequest.subject.toUpperCase()} - Regarding.`, 50, doc.y, { underline: true });
+
+    doc.moveDown(5);
+
+    // --- Content Section ---
+    doc.font('Helvetica').fontSize(12).text('Respected Sir/Madam,', 50);
+    doc.moveDown(2);
+
+    // Display student content directly
+    const mainContent = leaveRequest.content || leaveRequest.reason || 'No content provided.';
+    doc.text(mainContent, 50, doc.y, { align: 'justify', lineGap: 5 });
+
+    doc.moveDown(7);
+    doc.text('Thanking you,', 50);
+
+    doc.moveDown(5);
     doc.font('Helvetica-Bold').text('Yours obediently,', 400);
+    doc.moveDown(0.5);
     doc.text(leaveRequest.studentName.toUpperCase(), 400);
 
-    const bottomBlockY = 670;
-    doc.strokeColor('#666666').lineWidth(0.5).dash(5, { space: 3 }).moveTo(50, bottomBlockY - 15).lineTo(545, bottomBlockY - 15).stroke().undash();
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(11).text('■ OFFICIAL DIGITAL AUTHORIZATION', 50, bottomBlockY);
-    doc.y = bottomBlockY + 25;
-    doc.fillColor(textColor).font('Helvetica').fontSize(9).text('The above request has been verified and authorized by the department officials through the Attendanzy Secure System.', 50);
-    doc.moveDown(0.5);
-    doc.font('Helvetica-Bold').fontSize(8);
-    doc.text(`- STAFF APPROVAL: Forwarded by ${leaveRequest.forwardedBy || 'Class In-charge'}`, 60);
-    doc.text(`- HOD APPROVAL: Officially Accepted by Head of Department`, 60);
+    // --- Official Approval Block (Fixed Bottom) ---
+    const bottomBlockY = 660;
+    doc.strokeColor('#444444').lineWidth(0.7).dash(5, { space: 3 }).moveTo(50, bottomBlockY - 20).lineTo(545, bottomBlockY - 20).stroke().undash();
+
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('■ OFFICIAL DIGITAL AUTHORIZATION', 50, bottomBlockY);
+
+    doc.y = bottomBlockY + 28;
+    doc.fillColor('#333333').font('Helvetica').fontSize(9).text('This document is electronically verified and authorized by the department officials through the Attendanzy System.', 50, doc.y, { width: 380 });
+
+    doc.moveDown(1.2);
+    doc.font('Helvetica-Bold').fontSize(8.5);
+    doc.text(`- STAFF APPROVAL: Forwarded by ${leaveRequest.forwardedBy || 'Department Staff'}`, 60);
+    doc.text(`- HOD APPROVAL: Officially Authorized by Head of Department`, 60);
     doc.text(`- TIMESTAMP: ${new Date().toLocaleString('en-IN')}`, 60);
 
+    // QR Code Placement
     try {
-        doc.image(qrBuffer, 460, bottomBlockY + 15, { width: 75 });
-        doc.fillColor('#666666').font('Helvetica').fontSize(6).text('SCAN TO VERIFY', 460, bottomBlockY + 92, { width: 75, align: 'center' });
+        doc.image(qrBuffer, 460, bottomBlockY + 12, { width: 80 });
+        doc.fillColor('#666666').font('Helvetica').fontSize(6.5).text('DOC-VERIFY QR', 460, bottomBlockY + 95, { width: 80, align: 'center' });
     } catch (e) { }
 
-    doc.strokeColor('#EEEEEE').lineWidth(0.5).moveTo(50, 785).lineTo(545, 785).stroke();
-    doc.fillColor('#999999').font('Helvetica').fontSize(7).text('This is an official system-generated document. Verification URL: ' + verificationUrl, 50, 792, { width: 495, align: 'center' });
+    // Security Footer
+    doc.strokeColor('#DDDDDD').lineWidth(0.5).moveTo(50, 790).lineTo(545, 790).stroke();
+    doc.fillColor('#777777').font('Helvetica-Oblique').fontSize(7.5).text('Securely verifiable at: ' + verificationUrl, 50, 796, { width: 495, align: 'center' });
 
     doc.end();
 
@@ -296,9 +312,14 @@ exports.downloadLeavePDF = async (req, res) => {
         else if (id && id.startsWith('"')) id = id.slice(1, -1);
         const leave = await LeaveRequest.findById(id);
         if (!leave) return res.status(404).json({ success: false, message: 'Not found' });
-        if (!leave.leaveId || !fs.existsSync(path.join(__dirname, '../letters', `${leave.leaveId}.pdf`))) {
-            if (leave.status === 'accepted') await generateLeavePDFHelper(leave); else return res.status(404).json({ success: false, message: 'PDF not available' });
+
+        // Force regeneration to show latest design
+        if (leave.status === 'accepted') {
+            await generateLeavePDFHelper(leave);
+        } else if (!leave.leaveId || !fs.existsSync(path.join(__dirname, '../letters', `${leave.leaveId}.pdf`))) {
+            return res.status(404).json({ success: false, message: 'PDF not available' });
         }
+
         res.download(path.join(__dirname, '../letters', `${leave.leaveId}.pdf`), `Leave_${leave.studentName.replace(/\s+/g, '_')}.pdf`);
     } catch (error) { res.status(500).json({ success: false, message: 'Download failed', error: error.message }); }
 };

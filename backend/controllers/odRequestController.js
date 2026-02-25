@@ -29,6 +29,11 @@ const generateODPDFHelper = async (odRequest) => {
     }
 
     const pdfPath = path.join(lettersDir, `${odId}.pdf`);
+    // Delete existing PDF to ensure fresh generation with new design
+    if (fs.existsSync(pdfPath)) {
+        try { fs.unlinkSync(pdfPath); } catch (e) { }
+    }
+
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
     const stream = fs.createWriteStream(pdfPath);
     doc.pipe(stream);
@@ -40,12 +45,12 @@ const generateODPDFHelper = async (odRequest) => {
     // --- Background Watermark ---
     if (fs.existsSync(logoPath)) {
         doc.save();
-        doc.opacity(0.1);
-        doc.image(logoPath, 150, 300, { width: 300 });
+        doc.opacity(0.06);
+        doc.image(logoPath, 125, 250, { width: 350 });
         doc.restore();
     }
 
-    // --- Institutional Letterhead (Top Header) ---
+    // --- Institutional Letterhead ---
     if (fs.existsSync(logoPath)) {
         doc.image(logoPath, 50, 45, { width: 55 });
     }
@@ -56,67 +61,75 @@ const generateODPDFHelper = async (odRequest) => {
     doc.text('OMR, Thalambur, Chennai - 603 103, Tamil Nadu, India', 115, 82);
     doc.strokeColor('#333333').lineWidth(1).moveTo(50, 105).lineTo(545, 105).stroke();
 
-    doc.y = 120;
+    // Ref and Date
+    doc.y = 135;
     const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    doc.font('Helvetica-Bold').fontSize(9).text(`Ref: ACT/OD/${odId}`, 50, 120);
-    doc.text(`Date: ${today}`, 450, 120, { align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(9).text(`Ref: ACT/OD/${odId}`, 50, 135);
+    doc.text(`Date: ${today}`, 450, 135, { align: 'right' });
 
-    doc.moveDown(3);
+    // Vertical distribution
+    doc.moveDown(5);
+
+    // --- "From" Section ---
     doc.font('Helvetica-Bold').fontSize(10).text('From,', 50);
+    doc.moveDown(0.5);
     doc.font('Helvetica').fontSize(10);
-    doc.text(`${odRequest.studentName.toUpperCase()},`, 70);
-    doc.text(`${odRequest.studentEmail.split('@')[0].toUpperCase()}, ${odRequest.year} Year / ${odRequest.section},`, 70);
-    doc.text(`Department of ${odRequest.department || 'Engineering'}, Agni College of Technology.`, 70);
+    const fromText = odRequest.from || `${odRequest.studentName}\nDepartment of ${odRequest.department}\n${odRequest.year}-${odRequest.section}`;
+    doc.text(fromText, 75, doc.y, { lineGap: 3 });
 
-    doc.moveDown(2);
-    doc.font('Helvetica-Bold').fontSize(10).text('To,', 50);
-    doc.font('Helvetica').fontSize(10);
-    doc.text('The Head of Department,', 70);
-    doc.text(`Department of ${odRequest.department || 'Engineering'}, Agni College of Technology.`, 70);
-
-    doc.moveDown(2);
-    doc.font('Helvetica-Bold').fontSize(10).text('Through:', 50);
-    doc.font('Helvetica').fontSize(10).text('The Class In-charge / Staff Advisor.', 70);
-
-    doc.moveDown(3);
-    doc.font('Helvetica-Bold').fontSize(10).text(`Subject: Official Request for On-Duty (OD) Authorization - Regarding.`, 50, doc.y, { underline: true });
-
-    doc.moveDown(3.5);
-    doc.font('Helvetica').fontSize(11).text('Respected Sir/Madam,', 50);
-    doc.moveDown(1.5);
-    const bodyContent = `I am writing this to formally request your authorization for On-Duty (OD) status from ${odRequest.from} to ${odRequest.to} to participate in ${odRequest.subject}. I have provided the detailed activity description below.`;
-    doc.text(bodyContent, 50, doc.y, { align: 'justify', lineGap: 4 });
-
-    doc.moveDown(1.5);
-    doc.font('Helvetica-Bold').fontSize(10).text('Activity Description / Detailed Purpose:', 50);
-    doc.font('Helvetica').fontSize(10).text(odRequest.content || odRequest.reason || 'N/A', 60, doc.y + 4, { width: 485, align: 'justify', lineGap: 2 });
-
-    doc.moveDown(3.5);
-    doc.text('I request you to kindly grant me permission for the same as it is part of an official academic/professional activity.', 50, doc.y, { align: 'justify' });
-    doc.moveDown(2.5);
-    doc.text('Thanking you,', 50);
     doc.moveDown(4);
+
+    // --- "To" Section ---
+    doc.font('Helvetica-Bold').fontSize(10).text('To,', 50);
+    doc.moveDown(0.5);
+    doc.font('Helvetica').fontSize(10);
+    const toText = odRequest.to || `The Head of Department,\nDepartment of ${odRequest.department},\nAgni College of Technology.`;
+    doc.text(toText, 75, doc.y, { lineGap: 3 });
+
+    doc.moveDown(6);
+
+    // --- Subject Line ---
+    doc.font('Helvetica-Bold').fontSize(11).text(`Subject: ${odRequest.subject.toUpperCase()} - Regarding.`, 50, doc.y, { underline: true });
+
+    doc.moveDown(5);
+
+    // --- Content Section ---
+    doc.font('Helvetica').fontSize(12).text('Respected Sir/Madam,', 50);
+    doc.moveDown(2);
+
+    const mainContent = odRequest.content || odRequest.reason || 'No content provided.';
+    doc.text(mainContent, 50, doc.y, { align: 'justify', lineGap: 5 });
+
+    doc.moveDown(7);
+    doc.text('Thanking you,', 50);
+
+    doc.moveDown(5);
     doc.font('Helvetica-Bold').text('Yours obediently,', 400);
+    doc.moveDown(0.5);
     doc.text(odRequest.studentName.toUpperCase(), 400);
 
-    const bottomBlockY = 670;
-    doc.strokeColor('#666666').lineWidth(0.5).dash(5, { space: 3 }).moveTo(50, bottomBlockY - 15).lineTo(545, bottomBlockY - 15).stroke().undash();
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(11).text('■ OFFICIAL OD AUTHORIZATION', 50, bottomBlockY);
-    doc.y = bottomBlockY + 25;
-    doc.fillColor(textColor).font('Helvetica').fontSize(9).text('The above request has been verified and authorized by the department officials through the Attendanzy Secure System.', 50);
-    doc.moveDown(0.5);
-    doc.font('Helvetica-Bold').fontSize(8);
+    // --- Official Authorization Block ---
+    const bottomBlockY = 660;
+    doc.strokeColor('#444444').lineWidth(0.7).dash(5, { space: 3 }).moveTo(50, bottomBlockY - 20).lineTo(545, bottomBlockY - 20).stroke().undash();
+
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('■ OFFICIAL OD AUTHORIZATION', 50, bottomBlockY);
+
+    doc.y = bottomBlockY + 28;
+    doc.fillColor('#333333').font('Helvetica').fontSize(9).text('This document is electronically verified and authorized by the department officials through the Attendanzy System.', 50, doc.y, { width: 380 });
+
+    doc.moveDown(1.2);
+    doc.font('Helvetica-Bold').fontSize(8.5);
     doc.text(`- STAFF APPROVAL: Forwarded by ${odRequest.forwardedBy || 'Department Staff'}`, 60);
     doc.text(`- HOD APPROVAL: Officially Authorized by Head of Department`, 60);
     doc.text(`- TIMESTAMP: ${new Date().toLocaleString('en-IN')}`, 60);
 
     try {
-        doc.image(qrBuffer, 460, bottomBlockY + 15, { width: 75 });
-        doc.fillColor('#666666').font('Helvetica').fontSize(6).text('SCAN TO VERIFY', 460, bottomBlockY + 92, { width: 75, align: 'center' });
+        doc.image(qrBuffer, 460, bottomBlockY + 12, { width: 80 });
+        doc.fillColor('#666666').font('Helvetica').fontSize(6.5).text('DOC-VERIFY QR', 460, bottomBlockY + 95, { width: 80, align: 'center' });
     } catch (e) { }
 
-    doc.strokeColor('#EEEEEE').lineWidth(0.5).moveTo(50, 785).lineTo(545, 785).stroke();
-    doc.fillColor('#999999').font('Helvetica').fontSize(7).text('This is an official system-generated document. Verification URL: ' + verificationUrl, 50, 792, { width: 495, align: 'center' });
+    doc.strokeColor('#DDDDDD').lineWidth(0.5).moveTo(50, 790).lineTo(545, 790).stroke();
+    doc.fillColor('#777777').font('Helvetica-Oblique').fontSize(7.5).text('Securely verifiable at: ' + verificationUrl, 50, 796, { width: 495, align: 'center' });
 
     doc.end();
 
@@ -275,7 +288,7 @@ exports.verifyOD = async (req, res) => {
         const { odId } = req.params;
         const od = await ODRequest.findOne({ odId });
         if (!od) return res.status(404).send('<h1 style="color:red;text-align:center;">INVALID DOCUMENT ❌</h1>');
-        res.send(`<html><head><title>Verify</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{font-family:sans-serif;background:#f0f4f8;padding:20px;}.card{max-width:500px;margin:0 auto;background:white;padding:30px;border-radius:15px;box-shadow:0 10px 25px rgba(0,0,0,0.1); border-top: 5px solid #2563EB;}.header{text-align:center;border-bottom:1px solid #eee;margin-bottom:20px;}.status{display:inline-block;padding:8px 15px;border-radius:50px;background:#e0f2fe;color:#2563EB;font-weight:bold;margin-bottom:20px;}.field{margin-bottom:12px;}.label{font-size:11px;color:#888;text-transform:uppercase;}.value{font-size:15px;font-weight:500;}</style></head><body><div class="card"><div class="header"><h2>OD Verification</h2><p>Ref: ${od.odId}</p></div><div style="text-align:center;"><div class="status">VALID OD AUTHORIZATION</div></div><div class="field"><div class="label">Student</div><div class="value">${od.studentName}</div></div><div class="field"><div class="label">Reg No</div><div class="value">${od.studentEmail.split('@')[0].toUpperCase()}</div></div><div class="field"><div class="label">Dates</div><div class="value">${od.from} to ${od.to}</div></div><div class="field"><div class="label">Activity</div><div class="value">${od.subject}</div></div><div class="field"><div class="label">Authorized By</div><div class="value">HOD (via ${od.forwardedBy || 'Staff'})</div></div><div class="footer" style="text-align:center;margin-top:20px;font-size:10px;color:#aaa;">Secure Document Verification System</div></div></body></html>`);
+        res.send(`<html><head><title>Verify</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{font-family:sans-serif;background:#f0f4f8;padding:20px;}.card{max-width:500px;margin:0 auto;background:white;padding:30px;border-radius:15px;box-shadow:0 10px 25px rgba(0,0,0,0.1); border-top: 5px solid #2563EB;}.header{text-align:center;border-bottom:1px solid #eee;margin-bottom:20px;}.status{display:inline-block;padding:8px 15px;border-radius:50px;background:#e0f2fe;color:#2563EB;font-weight:bold;margin-bottom:20px;}.field{margin-bottom:12px;}.label{font-size:11px;color:#888;text-transform:uppercase;}.value{font-size:15px;font-weight:500;}</style></head><body><div class="card"><div class="header"><h2>OD Verification</h2><p>Ref: ${od.odId}</p></div><div style="text-align:center;"><div class="status">VALID LEAVE APPROVAL</div></div><div class="field"><div class="label">Student</div><div class="value">${od.studentName}</div></div><div class="field"><div class="label">Reg No</div><div class="value">${od.studentEmail.split('@')[0].toUpperCase()}</div></div><div class="field"><div class="label">Dates</div><div class="value">${od.from} to ${od.to}</div></div><div class="field"><div class="label">Approved By</div><div class="value">HOD (via ${od.forwardedBy || 'Staff'})</div></div><div class="footer" style="text-align:center;margin-top:20px;font-size:10px;color:#aaa;">Secure Document Verification System</div></div></body></html>`);
     } catch (e) { res.status(500).send("Error"); }
 };
 
@@ -286,9 +299,14 @@ exports.downloadODPDF = async (req, res) => {
         else if (id && id.startsWith('"')) id = id.slice(1, -1);
         const od = await ODRequest.findById(id);
         if (!od) return res.status(404).json({ success: false, message: 'Not found' });
-        if (!od.odId || !fs.existsSync(path.join(__dirname, '../letters', `${od.odId}.pdf`))) {
-            if (od.status === 'accepted') await generateODPDFHelper(od); else return res.status(404).json({ success: false, message: 'PDF not available' });
+
+        // Force regeneration to show latest design
+        if (od.status === 'accepted') {
+            await generateODPDFHelper(od);
+        } else if (!od.odId || !fs.existsSync(path.join(__dirname, '../letters', `${od.odId}.pdf`))) {
+            return res.status(404).json({ success: false, message: 'PDF not available' });
         }
+
         res.download(path.join(__dirname, '../letters', `${od.odId}.pdf`), `OD_${od.studentName.replace(/\s+/g, '_')}.pdf`);
     } catch (error) { res.status(500).json({ success: false, message: 'Download failed', error: error.message }); }
 };
