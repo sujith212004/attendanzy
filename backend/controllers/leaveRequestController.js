@@ -44,88 +44,126 @@ const generateLeavePDFHelper = async (leaveRequest) => {
     doc.pipe(stream);
 
     // PDF Design System
-    const accentColor = '#2ecc71'; // Green for Leave
+    const accentColor = '#27ae60'; // Professional Forest Green for Leave
+    const primaryBlue = '#1E88E5';
     const textColor = '#1F2937';
     const logoPath = path.join(__dirname, '../assets/logo.jpg');
 
-    // Header (Agni College of Technology Branding)
+    // --- Background & Borders ---
+    // Double Border
+    doc.lineWidth(2).strokeColor(accentColor).rect(20, 20, 555, 752).stroke();
+    doc.lineWidth(1).strokeColor(accentColor).rect(25, 25, 545, 742).stroke();
+
+    // Watermark
     if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, 260, 40, { width: 70 });
-        doc.moveDown(4.5);
+        doc.save();
+        doc.opacity(0.06);
+        doc.image(logoPath, 150, 250, { width: 300 });
+        doc.restore();
     }
 
+    // --- Header Section ---
+    // Header Style Block
+    doc.rect(26, 26, 543, 100).fill('#F8FAF9');
+
+    if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, 260, 35, { width: 70 });
+    }
+
+    doc.y = 105;
     doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(22).text('AGNI COLLEGE OF TECHNOLOGY', { align: 'center' });
     doc.fillColor(textColor).font('Helvetica-Bold').fontSize(11).text('An AUTONOMOUS Institution', { align: 'center' });
     doc.fillColor(textColor).font('Helvetica').fontSize(10).text('Affiliated to Anna University | Chennai - 603103', { align: 'center' });
-    doc.moveDown(1);
-    doc.strokeColor('#EEEEEE').lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+
+    doc.moveDown(1.5);
+    doc.strokeColor('#EEEEEE').lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
     doc.moveDown(1.5);
 
-    // Document Title
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(16).text('OFFICIAL LEAVE APPROVAL', { align: 'center' });
-    doc.moveDown(1);
+    // --- Document Title & Badges ---
+    const titleY = doc.y;
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(18).text('OFFICIAL LEAVE APPROVAL', { align: 'center' });
 
-    // Certificate of Authenticity Ribbon
-    doc.rect(50, doc.y, 500, 30).fill('#F3F4F6');
-    doc.fillColor('#4B5563').font('Helvetica-Bold').fontSize(11).text('OFFICIAL DOCUMENT • PROTECTED BY SECURE QR VERIFICATION', 60, doc.y + 9, { align: 'center' });
+    // Certified Badge (Top Right)
+    doc.save();
+    doc.translate(460, 140);
+    doc.rotate(-15);
+    doc.fillColor(accentColor).rect(0, 0, 80, 25).fill();
+    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(8).text('CERTIFIED', 0, 8, { width: 80, align: 'center' });
+    doc.restore();
+
+    doc.moveDown(1.5);
+
+    // --- Authenticity Ribbon ---
+    doc.rect(50, doc.y, 495, 30).fill('#F0FDF4');
+    doc.fillColor('#166534').font('Helvetica-Bold').fontSize(11).text('OFFICIAL DOCUMENT • PROTECTED BY SECURE QR VERIFICATION', 50, doc.y + 10, { align: 'center' });
     doc.moveDown(2.5);
 
-    // Main Content
-    const leftMargin = 60;
-    const labelWidth = 100;
+    // --- Main Content Area ---
+    const leftMargin = 70;
+    const labelWidth = 120;
 
-    // Helper to render field
     const renderField = (label, value) => {
         const currentY = doc.y;
         doc.fillColor('#6B7280').font('Helvetica').fontSize(11).text(label, leftMargin, currentY);
         doc.fillColor(textColor).font('Helvetica-Bold').fontSize(11).text(value, leftMargin + labelWidth, currentY);
-        doc.moveDown(1.2);
+        doc.moveDown(1.4);
     };
 
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(13).text('STUDENT INFORMATION', 50);
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(13).text('STUDENT DATA', 50);
     doc.moveDown(0.8);
-    renderField('Student Name:', leaveRequest.studentName);
+    renderField('Student Name:', leaveRequest.studentName.toUpperCase());
     renderField('Register No / Email:', leaveRequest.studentEmail);
     renderField('Department:', leaveRequest.department || 'N/A');
-    renderField('Year/Section:', `${leaveRequest.year} Year - ${leaveRequest.section}`);
+    renderField('Year & Section:', `${leaveRequest.year} Year - ${leaveRequest.section}`);
 
-    doc.moveDown(1.5);
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(13).text('LEAVE DETAILS', 50);
+    doc.moveDown(1);
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(13).text('LEAVE REQUEST DETAILS', 50);
     doc.moveDown(0.8);
     renderField('Subject:', leaveRequest.subject);
-    renderField('Leave Type:', leaveRequest.leaveType || 'General');
-    renderField('Duration:', `${leaveRequest.fromDate} to ${leaveRequest.toDate} (${leaveRequest.duration} Day[s])`);
+    renderField('Leave Category:', leaveRequest.leaveType || 'Standard');
+    renderField('Active Dates:', `${leaveRequest.fromDate} to ${leaveRequest.toDate}`);
+    renderField('Total Duration:', `${leaveRequest.duration} Day[s]`);
 
-    // Reason with wrapping
     const reasonY = doc.y;
-    doc.fillColor('#6B7280').font('Helvetica').fontSize(11).text('Reason:', leftMargin, reasonY);
-    doc.fillColor(textColor).font('Helvetica').fontSize(11).text(leaveRequest.reason || leaveRequest.content, leftMargin + labelWidth, reasonY, { width: 380, align: 'justify' });
+    doc.fillColor('#6B7280').font('Helvetica').fontSize(11).text('Reason / Note:', leftMargin, reasonY);
+    doc.fillColor(textColor).font('Helvetica').fontSize(11).text(leaveRequest.reason || leaveRequest.content, leftMargin + labelWidth, reasonY, { width: 340, align: 'justify' });
 
-    // QR Code Integration (Floating)
+    // --- Visual Verification Assets ---
+    // Floating QR Code
     try {
-        doc.image(qrBuffer, 410, 160, { width: 120 });
-        doc.fillColor('#6B7280').font('Helvetica').fontSize(8).text('SCAN TO VERIFY', 410, 285, { width: 120, align: 'center' });
+        doc.save();
+        doc.image(qrBuffer, 415, 170, { width: 110 });
+        doc.rect(415, 170, 110, 110).lineWidth(0.5).strokeColor('#EEEEEE').stroke();
+        doc.fillColor('#6B7280').font('Helvetica').fontSize(8).text('SCAN FOR VERIFICATION', 415, 285, { width: 110, align: 'center' });
+        doc.restore();
     } catch (imgError) {
         console.error('QR Image error:', imgError);
     }
 
-    // Approval Section
-    doc.y = 580;
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(14).text('APPROVAL STATUS: VERIFIED ✅', 50);
-    doc.fillColor('#059669').font('Helvetica-Bold').fontSize(12).text('Digitally Approved by Head of Department (HOD)', 50);
+    // --- Approval Footnote & Signatures ---
+    doc.y = 590;
+    const footerY = doc.y;
 
-    doc.moveDown(0.8);
-    doc.fillColor('#6B7280').font('Helvetica').fontSize(9);
-    doc.text(`Forwarded by: ${leaveRequest.forwardedBy || 'Department Staff'}`, 50);
-    doc.text(`Official ID: ${leaveId}`, 50);
-    doc.text(`Generated On: ${new Date().toLocaleString()}`, 50);
+    // Signature Placeholders
+    doc.fillColor(textColor).font('Helvetica-Bold').fontSize(10);
+    doc.text('______________________', 70, footerY + 60);
+    doc.text('STAFF IN-CHARGE', 70, footerY + 75);
 
-    // Security Footer
-    doc.rect(50, 715, 500, 45).fill('#F0FDF4');
-    doc.fillColor('#166534').font('Helvetica-Bold').fontSize(9).text('SECURITY WARNING:', 60, 725, { continued: true });
-    doc.font('Helvetica').fontSize(9).text(' This document is digitally verified. Any modification to names, dates, or content will be detectable via scanning. Verify authenticity by scanning the QR code or visiting the portal.', { width: 460 });
+    doc.text('______________________', 380, footerY + 60);
+    doc.text('HOD / PRINCIPAL', 380, footerY + 75);
+    doc.fontSize(8).font('Helvetica').fillColor('#9CA3AF').text('(Digitally Approved)', 380, footerY + 88, { width: 110, align: 'center' });
 
-    doc.fillColor(accentColor).fontSize(8).text(verificationUrl, 50, 770, { align: 'center' });
+    doc.y = footerY;
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(14).text('STATUS: OFFICIALLY APPROVED ✅', 50);
+    doc.fillColor('#059669').font('Helvetica-Bold').fontSize(11).text('Authentication ID: ' + leaveId, 50);
+    doc.fillColor('#6B7280').font('Helvetica').fontSize(9).text(`Generated: ${new Date().toLocaleString()}`, 50);
+
+    // --- Footer Security Warning ---
+    doc.rect(26, 735, 543, 35).fill('#F0FDF4');
+    doc.fillColor('#166534').font('Helvetica-Bold').fontSize(9).text('SECURITY:', 40, 746, { continued: true });
+    doc.font('Helvetica').fontSize(8.5).text(' This is an official system-generated document. Any unauthorized modification is strictly prohibited and detectable via secure QR scan.', 40, 746, { width: 510, align: 'center' });
+
+    doc.fillColor(accentColor).fontSize(8).text(verificationUrl, 50, 775, { align: 'center' });
 
     doc.end();
 

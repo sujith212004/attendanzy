@@ -5,18 +5,15 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 
-/**
- * Helper to generate Secure OD ID and PDF
- * @param {Object} odRequest - The OD Request document
- * @returns {Promise<Object>} - { odId, pdfPath, verificationUrl }
- */
+
+
 const generateODPDFHelper = async (odRequest) => {
     // Generate Secure OD ID if not exists
     if (!odRequest.odId) {
         const timestamp = new Date();
         const dateStr = timestamp.toISOString().replace(/[-:T.Z]/g, "").substring(0, 8);
         const randomStr = Math.random().toString(36).substring(2, 5).toUpperCase();
-        odRequest.odId = `OD-${dateStr}-${randomStr}`;
+        odRequest.odId = `ATZ-OD-${dateStr}-${randomStr}`;
     }
 
     const odId = odRequest.odId;
@@ -24,8 +21,7 @@ const generateODPDFHelper = async (odRequest) => {
     const verificationUrl = `${baseUrl}/api/od-requests/verify/${odId}`;
     odRequest.verificationUrl = verificationUrl;
 
-    // Generate QR Code as Buffer (safer for PDFKit)
-    console.log(`Generating QR Code for: ${verificationUrl}`);
+    // Generate QR Code as Buffer
     const qrBuffer = await QRCode.toBuffer(verificationUrl, {
         margin: 1,
         width: 200
@@ -44,79 +40,123 @@ const generateODPDFHelper = async (odRequest) => {
     doc.pipe(stream);
 
     // PDF Design System (Similar to Leave Request)
-    const accentColor = '#3B82F6'; // Blue for OD
+    const accentColor = '#2980b9'; // Professional Deep Blue for OD
     const textColor = '#1F2937';
+    const logoPath = path.join(__dirname, '../assets/logo.jpg');
 
-    // Header (Agni College of Technology Branding)
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(20).text('AGNI COLLEGE OF TECHNOLOGY', { align: 'center' });
-    doc.fillColor(textColor).font('Helvetica-Bold').fontSize(10).text('An AUTONOMOUS Institution', { align: 'center' });
-    doc.fillColor(textColor).font('Helvetica').fontSize(9).text('Affiliated to Anna University | Chennai - 603103', { align: 'center' });
-    doc.moveDown(1);
-    doc.strokeColor('#EEEEEE').lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    // --- Background & Borders ---
+    // Double Border
+    doc.lineWidth(2).strokeColor(accentColor).rect(20, 20, 555, 752).stroke();
+    doc.lineWidth(1).strokeColor(accentColor).rect(25, 25, 545, 742).stroke();
+
+    // Watermark
+    if (fs.existsSync(logoPath)) {
+        doc.save();
+        doc.opacity(0.06);
+        doc.image(logoPath, 150, 250, { width: 300 });
+        doc.restore();
+    }
+
+    // --- Header Section ---
+    // Header Style Block
+    doc.rect(26, 26, 543, 100).fill('#F8FAFC');
+
+    if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, 260, 35, { width: 70 });
+    }
+
+    doc.y = 105;
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(22).text('AGNI COLLEGE OF TECHNOLOGY', { align: 'center' });
+    doc.fillColor(textColor).font('Helvetica-Bold').fontSize(11).text('An AUTONOMOUS Institution', { align: 'center' });
+    doc.fillColor(textColor).font('Helvetica').fontSize(10).text('Affiliated to Anna University | Chennai - 603103', { align: 'center' });
+
+    doc.moveDown(1.5);
+    doc.strokeColor('#EEEEEE').lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
     doc.moveDown(1.5);
 
-    // Document Title
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(14).text('OFFICIAL ON-DUTY (OD) APPROVAL', { align: 'center', underline: true });
+    // --- Document Title & Badges ---
+    const titleY = doc.y;
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(18).text('OFFICIAL ON-DUTY (OD) APPROVAL', { align: 'center' });
+
+    // Certified Badge (Top Right)
+    doc.save();
+    doc.translate(460, 140);
+    doc.rotate(-15);
+    doc.fillColor(accentColor).rect(0, 0, 80, 25).fill();
+    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(8).text('AUTHORIZED', 0, 8, { width: 80, align: 'center' });
+    doc.restore();
+
+    doc.moveDown(1.5);
+
+    // --- Authenticity Ribbon ---
+    doc.rect(50, doc.y, 495, 30).fill('#EFF6FF');
+    doc.fillColor('#1E40AF').font('Helvetica-Bold').fontSize(11).text('OFFICIAL DOCUMENT • PROTECTED BY SECURE QR VERIFICATION', 50, doc.y + 10, { align: 'center' });
+    doc.moveDown(2.5);
+
+    // --- Main Content Area ---
+    const leftMargin = 70;
+    const labelWidth = 120;
+
+    const renderField = (label, value) => {
+        const currentY = doc.y;
+        doc.fillColor('#6B7280').font('Helvetica').fontSize(11).text(label, leftMargin, currentY);
+        doc.fillColor(textColor).font('Helvetica-Bold').fontSize(11).text(value, leftMargin + labelWidth, currentY);
+        doc.moveDown(1.4);
+    };
+
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(13).text('STUDENT DATA', 50);
+    doc.moveDown(0.8);
+    renderField('Student Name:', odRequest.studentName.toUpperCase());
+    renderField('Register No / Email:', odRequest.studentEmail);
+    renderField('Department:', odRequest.department || 'N/A');
+    renderField('Year & Section:', `${odRequest.year} Year - ${odRequest.section}`);
+
     doc.moveDown(1);
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(13).text('ON-DUTY (OD) DETAILS', 50);
+    doc.moveDown(0.8);
+    renderField('OD Subject:', odRequest.subject);
+    renderField('OD Duration:', `${odRequest.from} to ${odRequest.to}`);
 
-    // Certificate of Authenticity Ribbon
-    doc.rect(50, doc.y, 500, 25).fill('#F3F4F6');
-    doc.fillColor('#4B5563').font('Helvetica').fontSize(10).text('OFFICIAL DOCUMENT • PROTECTED BY SECURE QR VERIFICATION', 60, doc.y + 7, { align: 'center' });
-    doc.moveDown(2);
+    const descY = doc.y;
+    doc.fillColor('#6B7280').font('Helvetica').fontSize(11).text('Description:', leftMargin, descY);
+    doc.fillColor(textColor).font('Helvetica').fontSize(11).text(odRequest.content || odRequest.reason, leftMargin + labelWidth, descY, { width: 340, align: 'justify' });
 
-    // Student Info Table Style
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('STUDENT INFORMATION', { characterSpacing: 1 });
-    doc.moveDown(0.5);
-
-    const infoY = doc.y;
-    doc.fillColor(textColor).font('Helvetica');
-    doc.text('Name:', 50, infoY);
-    doc.font('Helvetica-Bold').text(odRequest.studentName, 150, infoY);
-
-    doc.font('Helvetica').text('Email:', 50, infoY + 20);
-    doc.text(odRequest.studentEmail, 150, infoY + 20);
-
-    doc.text('Dept/Year:', 50, infoY + 40);
-    doc.text(`${odRequest.department} - ${odRequest.year} Year (${odRequest.section})`, 150, infoY + 40);
-    doc.moveDown(3);
-
-    // OD Details
-    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(12).text('ON-DUTY (OD) DETAILS', { characterSpacing: 1 });
-    doc.moveDown(0.5);
-
-    const detailY = doc.y;
-    doc.fillColor(textColor).font('Helvetica');
-    doc.text('Subject:', 50, detailY);
-    doc.text(odRequest.subject, 150, detailY, { width: 400 });
-
-    doc.text('Duration:', 50, detailY + 20);
-    doc.text(`${odRequest.from} to ${odRequest.to}`, 150, detailY + 20);
-
-    doc.text('Description:', 50, detailY + 40);
-    doc.text(odRequest.content || odRequest.reason, 150, detailY + 40, { width: 400 });
-    doc.moveDown(4);
-
-    // Verification Section (QR and Text)
-    const qrY = doc.y;
+    // --- Visual Verification Assets ---
+    // Floating QR Code
     try {
-        doc.image(qrBuffer, 400, qrY - 20, { width: 120 });
+        doc.save();
+        doc.image(qrBuffer, 415, 170, { width: 110 });
+        doc.rect(415, 170, 110, 110).lineWidth(0.5).strokeColor('#EEEEEE').stroke();
+        doc.fillColor('#6B7280').font('Helvetica').fontSize(8).text('SCAN FOR VERIFICATION', 415, 285, { width: 110, align: 'center' });
+        doc.restore();
     } catch (imgError) {
         console.error('QR Image error:', imgError);
     }
 
-    doc.fillColor(accentColor).fontSize(12).text('APPROVAL STATUS: VERIFIED ✅', 50, qrY);
-    doc.fillColor('#059669').fontSize(10).text('Approved by Head of Department (HOD)', 50, qrY + 20);
-    doc.fillColor('#6B7280').fontSize(8);
-    doc.text(`Forwarded by: ${odRequest.forwardedBy || 'Department Staff'}`, 50, qrY + 40);
-    doc.text(`Approval ID: ${odId}`, 50, qrY + 54);
-    doc.text(`Issued On: ${new Date().toLocaleString()}`, 50, qrY + 68);
+    // --- Approval Footnote & Signatures ---
+    doc.y = 590;
+    const footerY = doc.y;
 
-    // Security Footer
-    doc.moveDown(4);
-    doc.rect(50, 710, 500, 50).fill('#F0FDF4');
-    doc.fillColor('#166534').fontSize(8).text('SECURITY WARNING: This document is digitally verified via QR. Any modification to the names, dates, or content of this PDF will be detectable via scanning. To verify authenticity, scan the QR code or visit the verification portal.', 60, 720, { width: 480, align: 'center' });
+    // Signature Placeholders
+    doc.fillColor(textColor).font('Helvetica-Bold').fontSize(10);
+    doc.text('______________________', 70, footerY + 60);
+    doc.text('STAFF IN-CHARGE', 70, footerY + 75);
 
-    doc.fillColor(accentColor).fontSize(8).text(verificationUrl, 50, 770, { align: 'center' });
+    doc.text('______________________', 380, footerY + 60);
+    doc.text('HOD / PRINCIPAL', 380, footerY + 75);
+    doc.fontSize(8).font('Helvetica').fillColor('#9CA3AF').text('(Digitally Approved)', 380, footerY + 88, { width: 110, align: 'center' });
+
+    doc.y = footerY;
+    doc.fillColor(accentColor).font('Helvetica-Bold').fontSize(14).text('STATUS: OFFICIALLY APPROVED ✅', 50);
+    doc.fillColor('#1D4ED8').font('Helvetica-Bold').fontSize(11).text('Authentication ID: ' + odId, 50);
+    doc.fillColor('#6B7280').font('Helvetica').fontSize(9).text(`Generated: ${new Date().toLocaleString()}`, 50);
+
+    // --- Footer Security Warning ---
+    doc.rect(26, 735, 543, 35).fill('#EFF6FF');
+    doc.fillColor('#1E40AF').font('Helvetica-Bold').fontSize(9).text('SECURITY:', 40, 746, { continued: true });
+    doc.font('Helvetica').fontSize(8.5).text(' This is an official system-generated document. Any unauthorized modification is strictly prohibited and detectable via secure QR scan.', 40, 746, { width: 510, align: 'center' });
+
+    doc.fillColor(accentColor).fontSize(8).text(verificationUrl, 50, 775, { align: 'center' });
 
     doc.end();
 
@@ -296,23 +336,6 @@ exports.updateStaffStatus = async (req, res) => {
             year,
             section
         } = req.body;
-
-        if (!status || !['accepted', 'rejected', 'approved'].includes(status)) {
-            // Accommodate 'accepted' as alias for 'approved' if needed, or strictly enforce.
-            // Frontend sends 'accepted' or 'rejected'.
-            // But let's check what frontend sends.
-            // Frontend sends "accepted" or "rejected".
-            // Backend previous check was ['approved', 'rejected']
-        }
-
-        // Normalize status: frontend sends 'accepted', backend expects 'accepted' or 'approved'?
-        // The ODRequest schema has staffStatus enum: ['pending', 'approved', 'rejected']
-        // Wait, schema says 'approved', but frontend uses 'accepted'.
-        // I should map 'accepted' to 'approved' or update schema.
-        // Let's stick to what schema has.
-        // Frontend sends "accepted" (line 1312)
-        // Schema (viewed earlier): enum: ['pending', 'approved', 'rejected']
-        // So I should convert 'accepted' to 'approved'.
 
         let dbStatus = status;
         if (status === 'accepted') dbStatus = 'approved';
@@ -773,13 +796,6 @@ exports.downloadODPDF = async (req, res) => {
             return res.status(404).json({
                 success: false,
                 message: `Failed to generate or find PDF file on server.`,
-            });
-        }
-
-        if (!fs.existsSync(pdfPath)) {
-            return res.status(404).json({
-                success: false,
-                message: 'PDF file missing on server',
             });
         }
 
