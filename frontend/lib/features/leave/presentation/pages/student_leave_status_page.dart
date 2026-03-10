@@ -4,14 +4,16 @@ import 'package:mongo_dart/mongo_dart.dart' as mongo;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/file_service.dart';
 import '../../../../core/config/local_config.dart';
 import '../../../../core/config/api_config.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class StudentLeaveStatusPage extends StatefulWidget {
-  final String studentEmail;
+  final String? studentEmail;
 
-  const StudentLeaveStatusPage({super.key, required this.studentEmail});
+  const StudentLeaveStatusPage({super.key, this.studentEmail});
 
   @override
   State<StudentLeaveStatusPage> createState() => _StudentLeaveStatusPageState();
@@ -19,10 +21,21 @@ class StudentLeaveStatusPage extends StatefulWidget {
 
 class _StudentLeaveStatusPageState extends State<StudentLeaveStatusPage>
     with TickerProviderStateMixin {
+  late String? _studentEmail;
   final String mongoUri = LocalConfig.mongoUri;
+
+  Future<void> _initializeEmail() async {
+    _studentEmail = widget.studentEmail;
+    if (_studentEmail == null || _studentEmail!.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      _studentEmail = prefs.getString('email');
+    }
+  }
+
   final String collectionName = "leave_requests";
 
   List<Map<String, dynamic>> myRequests = [];
+  String get studentEmail => _studentEmail ?? '';
   bool loading = true;
   String? error;
   String _selectedFilter = 'All';
@@ -42,6 +55,7 @@ class _StudentLeaveStatusPageState extends State<StudentLeaveStatusPage>
   @override
   void initState() {
     super.initState();
+    _initializeEmail();
     _initializeAnimations();
     fetchStudentRequests();
   }
@@ -93,7 +107,7 @@ class _StudentLeaveStatusPageState extends State<StudentLeaveStatusPage>
           await collection
               .find(
                 mongo.where
-                    .eq("studentEmail", widget.studentEmail)
+                    .eq("studentEmail", studentEmail)
                     .sortBy('createdAt', descending: true),
               )
               .toList();

@@ -4,14 +4,15 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:mongo_dart/mongo_dart.dart' as mongo;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/file_service.dart';
 import '../../../../core/config/local_config.dart';
 import '../../../../core/config/api_config.dart';
 
 class StudentODStatusPage extends StatefulWidget {
-  final String studentEmail;
+  final String? studentEmail;
 
-  const StudentODStatusPage({super.key, required this.studentEmail});
+  const StudentODStatusPage({super.key, this.studentEmail});
 
   @override
   State<StudentODStatusPage> createState() => _StudentODStatusPageState();
@@ -88,7 +89,10 @@ class _StudentODStatusPageState extends State<StudentODStatusPage>
   final String mongoUri = LocalConfig.mongoUri;
   final String collectionName = "od_requests";
 
+  late String? _studentEmail;
+
   List<Map<String, dynamic>> myRequests = [];
+  String get studentEmail => _studentEmail ?? '';
   bool loading = true;
   String? error;
   String _selectedFilter = 'All';
@@ -108,8 +112,17 @@ class _StudentODStatusPageState extends State<StudentODStatusPage>
   @override
   void initState() {
     super.initState();
+    _initializeEmail();
     _initializeAnimations();
     fetchStudentRequests();
+  }
+
+  Future<void> _initializeEmail() async {
+    _studentEmail = widget.studentEmail;
+    if (_studentEmail == null || _studentEmail!.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      _studentEmail = prefs.getString('email');
+    }
   }
 
   void _initializeAnimations() {
@@ -157,7 +170,7 @@ class _StudentODStatusPageState extends State<StudentODStatusPage>
           await collection
               .find(
                 mongo.where
-                    .eq("studentEmail", widget.studentEmail)
+                    .eq("studentEmail", studentEmail)
                     .sortBy('createdAt', descending: true),
               )
               .toList();

@@ -109,14 +109,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         position: Tween<Offset>(
           begin: const Offset(0, 0.1),
           end: Offset.zero,
-        ).animate(CurvedAnimation(
-          parent: _staggerController,
-          curve: Interval(
-             0.1 * index, 
-             0.6 + (0.1 * index), 
-             curve: Curves.easeOutCubic
+        ).animate(
+          CurvedAnimation(
+            parent: _staggerController,
+            curve: Interval(
+              0.1 * index,
+              0.6 + (0.1 * index),
+              curve: Curves.easeOutCubic,
+            ),
           ),
-        )),
+        ),
         child: child,
       ),
     );
@@ -948,6 +950,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               year: year?.toString() ?? '-',
               department: department?.toString() ?? '-',
               section: section?.toString() ?? '-',
+              role: widget.role,
+              status: 'Active',
             ),
       ),
     );

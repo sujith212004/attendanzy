@@ -262,11 +262,12 @@ class _ODRequestPageState extends State<ODRequestPage>
         _proofImage = null;
       });
 
-      await _loadRequestStatus();
-
       HapticFeedback.heavyImpact();
       _showRequestSubmittedDialog(requestData);
       _showSnackBar('Request submitted successfully!', isSuccess: true);
+
+      // Load request status in background without blocking UI
+      _loadRequestStatus();
     } catch (e) {
       setState(() {
         _isSubmitting = false;

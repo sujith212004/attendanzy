@@ -421,13 +421,13 @@ class _LeaveRequestPageState extends State<LeaveRequestPage>
         _isSubmitting = false;
       });
 
-      // Reload the request status to show the newly submitted request
-      await _loadRequestStatus();
-
       HapticFeedback.heavyImpact();
       // show animation-only dialog and auto-close when complete
       _showRequestSubmittedDialog(requestData);
       _showSnackBar('Leave request submitted successfully!', isError: false);
+
+      // Reload the request status in background without blocking UI
+      _loadRequestStatus();
 
       return;
     } catch (e) {

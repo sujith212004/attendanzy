@@ -11,6 +11,8 @@ class ProfilePage extends StatefulWidget {
   final String year;
   final String department;
   final String section;
+  final String role;
+  final String status;
 
   const ProfilePage({
     super.key,
@@ -19,6 +21,8 @@ class ProfilePage extends StatefulWidget {
     required this.year,
     required this.department,
     required this.section,
+    this.role = 'User',
+    this.status = 'Active',
   });
 
   @override
@@ -98,6 +102,19 @@ class _ProfilePageState extends State<ProfilePage>
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }
     return widget.name.isNotEmpty ? widget.name[0].toUpperCase() : '?';
+  }
+
+  static String _getRoleDisplayName(String role) {
+    switch (role.toLowerCase()) {
+      case 'user':
+        return 'Student';
+      case 'staff':
+        return 'Staff';
+      case 'hod':
+        return 'HOD';
+      default:
+        return 'User';
+    }
   }
 
   Widget _staggered(int index, Widget child) {
@@ -371,9 +388,9 @@ class _ProfilePageState extends State<ProfilePage>
                 ),
               ),
               const SizedBox(width: 7),
-              const Text(
-                'Student · Active',
-                style: TextStyle(
+              Text(
+                '${_getRoleDisplayName(widget.role)} · ${widget.status}',
+                style: const TextStyle(
                   fontSize: 12,
                   color: Color(0xFF4F46E5),
                   fontWeight: FontWeight.w700,
@@ -485,14 +502,14 @@ class _ProfilePageState extends State<ProfilePage>
           _DetailRow(
             icon: Icons.badge_rounded,
             label: 'Role',
-            value: 'Student',
+            value: _getRoleDisplayName(widget.role),
             iconColor: const Color(0xFF6366F1),
           ),
           const _RowDivider(),
           _DetailRow(
             icon: Icons.verified_rounded,
             label: 'Status',
-            value: 'Active',
+            value: widget.status,
             iconColor: const Color(0xFF10B981),
             valueColor: const Color(0xFF10B981),
           ),

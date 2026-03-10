@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:ui';
+import 'dart:convert';
 import '../../../home/presentation/pages/homepage.dart';
 import '../../../../core/services/api_service.dart';
 import '../../../../core/services/firebase_api.dart';
@@ -94,26 +95,91 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   // ... _login method implementation ...
   Future<void> _checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
-    final email = prefs.getString('email');
-    final name = prefs.getString('name');
-    final role = prefs.getString('role') ?? '';
-    final isStaff = prefs.getBool('isStaff') ?? false;
 
-    if (email != null && name != null && role.isNotEmpty) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder:
-              (context) => HomePage(
-                name: name,
-                email: email,
-                profile: {},
-                isStaff: isStaff,
-                role: role,
+    try {
+      // Try to get complete profile from JSON storage first
+      final profileJson = prefs.getString('profile_data');
+      if (profileJson != null && profileJson.isNotEmpty) {
+        final profile = jsonDecode(profileJson) as Map<String, dynamic>;
+        final email = profile['email']?.toString().trim() ?? '';
+        final name = profile['name']?.toString().trim() ?? '';
+        final role = profile['role']?.toString().trim() ?? '';
+        final isStaff = profile['isStaff'] == true;
+
+        if (email.isNotEmpty && name.isNotEmpty && role.isNotEmpty) {
+          print('✓ Restoring profile from JSON: $name ($email) - $role');
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (context) => HomePage(
+                      name: name,
+                      email: email,
+                      profile: profile,
+                      isStaff: isStaff,
+                      role: role,
+                    ),
               ),
-        ),
-      );
+            );
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      print('✗ Error parsing profile_data: $e');
     }
+
+    // Fallback to individual key storage for backwards compatibility
+    try {
+      final email = prefs.getString('email')?.trim() ?? '';
+      final name = prefs.getString('name')?.trim() ?? '';
+      final role = prefs.getString('role')?.trim() ?? '';
+      final isStaff = prefs.getBool('isStaff') ?? false;
+      final year = prefs.getString('year')?.trim() ?? '';
+      final sec = prefs.getString('sec')?.trim() ?? '';
+      final department = prefs.getString('department')?.trim() ?? '';
+      final staffName = prefs.getString('staffName')?.trim() ?? '';
+
+      if (email.isNotEmpty && name.isNotEmpty && role.isNotEmpty) {
+        print('✓ Restoring profile from individual keys: $name ($email) - $role');
+        
+        // Reconstruct profile object
+        final profile = {
+          'email': email,
+          'name': name,
+          'role': role,
+          'department': department,
+          'isStaff': isStaff,
+          'year': year,
+          'sec': sec,
+          'Year': year,
+          'Sec': sec,
+          if (staffName.isNotEmpty) 'staffName': staffName,
+        };
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (context) => HomePage(
+                    name: name,
+                    email: email,
+                    profile: profile,
+                    isStaff: isStaff,
+                    role: role,
+                  ),
+            ),
+          );
+        }
+        return;
+      }
+    } catch (e) {
+      print('✗ Error retrieving individual keys: $e');
+    }
+
+    print('~ No saved profile found, showing login screen');
   }
 
   void _login() async {
@@ -155,35 +221,50 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
           print('==================');
 
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(
-            'email',
-            user["email"] ?? user["College Email"] ?? '',
-          );
-          await prefs.setString('name', user["name"] ?? user["Name"] ?? '');
+
+          // Extract only serializable data
+          final email = user["email"] ?? user["College Email"] ?? '';
+          final name = user["name"] ?? user["Name"] ?? '';
+          final year = user['year'] ?? user['Year'] ?? '';
+          final sec = user['sec'] ?? user['Sec'] ?? '';
+          final staffName = user['name'] ?? user['Name'] ?? '';
+
+          // Prepare complete profile data with only serializable values
+          final profileData = {
+            'email': email,
+            'name': name,
+            'role': selectedRole,
+            'department': selectedDepartment,
+            'isStaff': selectedRole == 'staff' || selectedRole == 'hod',
+            'year': year,
+            'sec': sec,
+            'Year': year,
+            'Sec': sec,
+            if (selectedRole == 'staff') 'staffName': staffName,
+          };
+
+          // Save complete profile as JSON for reliable restoration
+          try {
+            await prefs.setString('profile_data', jsonEncode(profileData));
+            print('✓ Profile data saved to SharedPreferences');
+          } catch (e) {
+            print('✗ Error saving profile_data: $e');
+          }
+
+          // Also save individual keys for backward compatibility and immediate access
+          await prefs.setString('email', email);
+          await prefs.setString('name', name);
           await prefs.setBool(
             'isStaff',
             selectedRole == 'staff' || selectedRole == 'hod',
           );
           await prefs.setString('role', selectedRole);
           await prefs.setString('department', selectedDepartment);
-
-          if (selectedRole == 'user') {
-            await prefs.setString('year', user['year'] ?? '');
-            await prefs.setString('sec', user['sec'] ?? '');
-          }
+          await prefs.setString('year', year);
+          await prefs.setString('sec', sec);
 
           if (selectedRole == 'staff') {
-            await prefs.setString('year', user['year'] ?? '');
-            await prefs.setString('sec', user['sec'] ?? '');
-            await prefs.setString(
-              'staffName',
-              user['name'] ?? user['Name'] ?? '',
-            );
-          }
-
-          if (selectedRole == 'hod') {
-            await prefs.setString('year', user['year'] ?? '');
-            await prefs.setString('sec', user['sec'] ?? '');
+            await prefs.setString('staffName', staffName);
           }
 
           final userEmail = user["email"] ?? user["College Email"] ?? '';

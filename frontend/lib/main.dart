@@ -10,6 +10,13 @@ import 'features/home/presentation/pages/homepage.dart';
 import 'features/attendance/presentation/pages/attendance.dart';
 import 'features/auth/presentation/pages/loginpage.dart';
 import 'features/od/presentation/pages/odrequestpage.dart';
+import 'features/od/presentation/pages/StaffOdrequest.dart';
+import 'features/od/presentation/pages/hod_od_management_page.dart';
+import 'features/leave/presentation/pages/leave_request_page.dart';
+import 'features/leave/presentation/pages/leavereqStaffpage.dart';
+import 'features/leave/presentation/pages/hod_leave_management_page.dart';
+import 'features/leave/presentation/pages/student_leave_status_page.dart';
+import 'features/od/presentation/pages/studentODstatespage.dart';
 import 'features/home/presentation/pages/profile_page.dart';
 import 'features/academics/presentation/pages/timetable_page.dart';
 import 'features/attendance/presentation/pages/attendancemark.dart';
@@ -289,14 +296,20 @@ class _MyAppState extends State<MyApp> {
                 department: 'Default Department',
                 year: 'Default Year',
                 section: 'Default Section',
+                role: 'user',
+                status: 'Active',
               ),
           '/ ': (context) => const GPACalculatorPage(),
           '/timetablepage': (context) => TimetablePage(),
           '/odrequestpage': (context) => const ODRequestPage(),
-          // Notification handler routes
-          '/staff-requests': (context) => const ODRequestPage(),
-          '/hod-requests': (context) => const ODRequestPage(),
-          '/request-status': (context) => const ODRequestPage(),
+          // Notification handler routes - OD Requests
+          '/staff-od-requests': (context) => const ODRequestsstaffPage(),
+          '/hod-od-requests': (context) => const HodOdManagementPage(),
+          '/student-od-status': (context) => const StudentODStatusPage(),
+          // Notification handler routes - Leave Requests
+          '/staff-leave-requests': (context) => const LeaveRequestsStaffPage(),
+          '/hod-leave-requests': (context) => const HodLeaveManagementPage(),
+          '/student-leave-status': (context) => const StudentLeaveStatusPage(),
         },
       ),
     );

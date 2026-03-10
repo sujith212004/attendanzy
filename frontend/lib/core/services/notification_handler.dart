@@ -9,23 +9,38 @@ class NotificationHandler {
   static Future<void> handleNotification(RemoteMessage message) async {
     final data = message.data;
     final notificationType = data['type'] ?? '';
+    final requestType =
+        data['requestType'] ?? 'OD'; // Default to OD if not specified
 
     print('🔔 Notification tapped: $notificationType');
+    print('📋 Request Type: $requestType');
 
-    // Navigate based on notification type
+    // Navigate based on notification type and request type
     switch (notificationType) {
       case 'new_request':
         // Staff should see pending requests
-        _navigateTo('/staff-requests');
+        if (requestType.toUpperCase() == 'LEAVE') {
+          _navigateTo('/staff-leave-requests');
+        } else {
+          _navigateTo('/staff-od-requests');
+        }
         break;
       case 'forwarded_request':
         // HOD should see forwarded requests
-        _navigateTo('/hod-requests');
+        if (requestType.toUpperCase() == 'LEAVE') {
+          _navigateTo('/hod-leave-requests');
+        } else {
+          _navigateTo('/hod-od-requests');
+        }
         break;
       case 'status_update':
       case 'hod_decision':
         // Student should see their request status
-        _navigateTo('/request-status');
+        if (requestType.toUpperCase() == 'LEAVE') {
+          _navigateTo('/student-leave-status');
+        } else {
+          _navigateTo('/student-od-status');
+        }
         break;
       default:
         print('Unknown notification type: $notificationType');
