@@ -167,11 +167,10 @@ class FirebaseApi {
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
           'attendanzy_notifications',
-          'Attendanzy Notifications',
-          channelDescription: 'Notifications for leave and OD request updates',
+          'Attendanzy Notifications',  channelDescription: 'Notifications for leave and OD request updates',
           importance: Importance.high,
           priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
+          icon: '@mipmap/launcher_icon',
         );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
@@ -193,7 +192,6 @@ class FirebaseApi {
       payload: payload,
     );
   }
-
   Future<void> _sendTokenToBackend(String token) async {
     try {
       final prefs = await SharedPreferences.getInstance();

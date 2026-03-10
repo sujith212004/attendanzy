@@ -925,7 +925,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         (widget.profile['student'] != null &&
                 widget.profile['student']['year'] != null)
             ? widget.profile['student']['year']
-            : (widget.profile['year'] ?? widget.profile['studentYear']);
+            : (widget.profile['year'] ??
+                widget.profile['Year'] ??
+                widget.profile['studentYear']);
     dynamic department =
         (widget.profile['student'] != null &&
                 widget.profile['student']['department'] != null)
@@ -939,6 +941,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ? widget.profile['student']['section']
             : (widget.profile['section'] ??
                 widget.profile['sec'] ??
+                widget.profile['Sec'] ??
                 widget.profile['studentSection']);
 
     Navigator.of(context).push(
@@ -947,9 +950,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             (_) => ProfilePage(
               name: widget.name,
               email: widget.email,
-              year: year?.toString() ?? '-',
-              department: department?.toString() ?? '-',
-              section: section?.toString() ?? '-',
+              year: (year?.toString() ?? '').isNotEmpty ? year.toString() : '-',
+              department: (department?.toString() ?? '').isNotEmpty ? department.toString() : '-',
+              section: (section?.toString() ?? '').isNotEmpty ? section.toString() : '-',
               role: widget.role,
               status: 'Active',
             ),

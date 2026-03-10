@@ -136,14 +136,20 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
       final name = prefs.getString('name')?.trim() ?? '';
       final role = prefs.getString('role')?.trim() ?? '';
       final isStaff = prefs.getBool('isStaff') ?? false;
-      final year = prefs.getString('year')?.trim() ?? '';
-      final sec = prefs.getString('sec')?.trim() ?? '';
+      final year = (prefs.getString('year')?.trim() ?? '').isEmpty
+          ? prefs.getString('Year')?.trim() ?? ''
+          : prefs.getString('year')?.trim() ?? '';
+      final sec = (prefs.getString('sec')?.trim() ?? '').isEmpty
+          ? prefs.getString('Sec')?.trim() ?? ''
+          : prefs.getString('sec')?.trim() ?? '';
       final department = prefs.getString('department')?.trim() ?? '';
       final staffName = prefs.getString('staffName')?.trim() ?? '';
 
       if (email.isNotEmpty && name.isNotEmpty && role.isNotEmpty) {
-        print('✓ Restoring profile from individual keys: $name ($email) - $role');
-        
+        print(
+          '✓ Restoring profile from individual keys: $name ($email) - $role',
+        );
+
         // Reconstruct profile object
         final profile = {
           'email': email,
