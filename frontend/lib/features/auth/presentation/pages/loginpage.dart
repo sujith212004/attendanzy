@@ -266,8 +266,11 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
           );
           await prefs.setString('role', selectedRole);
           await prefs.setString('department', selectedDepartment);
+          // Save both lowercase and uppercase variants
           await prefs.setString('year', year);
+          await prefs.setString('Year', year);
           await prefs.setString('sec', sec);
+          await prefs.setString('Sec', sec);
 
           if (selectedRole == 'staff') {
             await prefs.setString('staffName', staffName);
